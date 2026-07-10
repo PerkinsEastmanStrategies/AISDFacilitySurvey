@@ -49,9 +49,14 @@ import {
   hasSeenWelcome,
   markWelcomeSeen,
 } from "@/components/welcome-dialog";
+import {
+  loadSurveyDraft,
+  saveSurveyDraft,
+  type SurveyStep,
+} from "@/lib/survey-draft";
 import Image from "next/image";
 
-type Step = "intro" | "questions" | "report";
+type Step = SurveyStep;
 type RightView = "floorplan" | "map";
 type AnnotationFilterMode = "current" | "all";
 
@@ -88,7 +93,8 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
   const [currentPanelIndex, setCurrentPanelIndex] = useState(0);
   const [annotationTool, setAnnotationTool] = useState<Tool>("pan");
   const [annotationClassification, setAnnotationClassification] = useState<Classification>("strength");
-  const [rightView, setRightView] = useState<RightView>("map");
+  // Prefer floor plan by default — Mapbox WebGL is a common mobile tab-kill trigger.
+  const [rightView, setRightView] = useState<RightView>("floorplan");
   const [annotationFilterMode, setAnnotationFilterMode] =
     useState<AnnotationFilterMode>("current");
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
@@ -100,6 +106,10 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
   const [tourQuestionsSeen, setTourQuestionsSeen] = useState(false);
   const [tourReportSeen, setTourReportSeen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  // On phones, keep map/plan collapsed until the user opens it so WebGL/SVG
+  // don't load while they are still answering the first question.
+  const [mobileViewerOpen, setMobileViewerOpen] = useState(false);
   const isMobile = useIsMobile();
   const [surveyData, setSurveyData] = useState<SurveyData>({
     school: "",
@@ -118,6 +128,48 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
     svgContent: defaultSvg,
     spaceAssignments: {},
   });
+
+  // Restore in-progress survey after a mobile reload / tab discard.
+  useEffect(() => {
+    const draft = loadSurveyDraft();
+    if (draft) {
+      setStep(draft.step);
+      setCurrentPanelIndex(draft.currentPanelIndex);
+      setRightView(draft.rightView);
+      setActiveFloorId(draft.activeFloorId);
+      setSurveyData((prev) => ({
+        ...draft.surveyData,
+        svgContent: prev.svgContent,
+      }));
+      if (draft.step === "questions" || draft.step === "report") {
+        setTourIntroSeen(true);
+        setTourQuestionsSeen(draft.step === "report");
+      }
+    }
+    setDraftReady(true);
+  }, []);
+
+  // Persist draft (without the large SVG) so a phone reload can resume.
+  useEffect(() => {
+    if (!draftReady) return;
+    const timer = window.setTimeout(() => {
+      saveSurveyDraft({
+        step,
+        currentPanelIndex,
+        rightView,
+        activeFloorId,
+        surveyData,
+      });
+    }, 250);
+    return () => window.clearTimeout(timer);
+  }, [
+    draftReady,
+    step,
+    currentPanelIndex,
+    rightView,
+    activeFloorId,
+    surveyData,
+  ]);
 
   // The set of questions the current respondent answers, based on their role.
   const activeQuestions = useMemo(
@@ -213,7 +265,10 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
   // Force the floor plan into view for the spaces question (room placement
   // only happens on the plan, not the map).
   useEffect(() => {
-    if (isSpacesQuestion) setRightView("floorplan");
+    if (isSpacesQuestion) {
+      setRightView("floorplan");
+      setMobileViewerOpen(true);
+    }
   }, [isSpacesQuestion]);
 
   // Load floor plan manifest + default floor when a school is selected.
@@ -408,25 +463,37 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
   }, [step]);
 
   useEffect(() => {
+    if (!isMobile) return;
+    setTourIntroSeen(true);
+    setTourQuestionsSeen(true);
+    setTourReportSeen(true);
+    setRunTour(false);
+  }, [isMobile]);
+
+  useEffect(() => {
+    // Auto-tours fight with mobile scrolling and can stress the viewer; skip them.
+    if (isMobile || !draftReady) return;
     if (step !== "intro" || tourIntroSeen || showWelcome) return;
     setTourIntroSeen(true);
     const timer = window.setTimeout(() => setRunTour(true), 450);
     return () => window.clearTimeout(timer);
-  }, [step, tourIntroSeen, showWelcome]);
+  }, [step, tourIntroSeen, showWelcome, isMobile, draftReady]);
 
   useEffect(() => {
+    if (isMobile || !draftReady) return;
     if (step !== "questions" || tourQuestionsSeen) return;
     setTourQuestionsSeen(true);
     const timer = window.setTimeout(() => setRunTour(true), 450);
     return () => window.clearTimeout(timer);
-  }, [step, tourQuestionsSeen]);
+  }, [step, tourQuestionsSeen, isMobile, draftReady]);
 
   useEffect(() => {
+    if (isMobile || !draftReady) return;
     if (step !== "report" || tourReportSeen) return;
     setTourReportSeen(true);
     const timer = window.setTimeout(() => setRunTour(true), 450);
     return () => window.clearTimeout(timer);
-  }, [step, tourReportSeen]);
+  }, [step, tourReportSeen, isMobile, draftReady]);
 
   const handleNext = () => {
     if (step === "intro") {
@@ -639,13 +706,34 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
 
     return (
       <div className="mt-3 flex flex-col overflow-hidden rounded-lg border border-border/60 bg-gradient-to-br from-background to-muted/30 p-2 shadow-sm">
-        {renderViewerHeader(true)}
-        <div
-          data-tour="viewer"
-          className="mt-1.5 aspect-square w-full overflow-hidden rounded-md border border-border/60 bg-card"
+        <button
+          type="button"
+          onClick={() => setMobileViewerOpen((open) => !open)}
+          className="flex w-full items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-left transition-colors hover:bg-muted/70"
         >
-          {renderViewerContent()}
-        </div>
+          <span className="text-[11px] font-semibold text-foreground">
+            Floor plan &amp; site map
+          </span>
+          <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+            {mobileViewerOpen ? "Hide" : "Show"}
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${
+                mobileViewerOpen ? "rotate-180" : ""
+              }`}
+            />
+          </span>
+        </button>
+        {mobileViewerOpen && (
+          <>
+            <div className="mt-1.5">{renderViewerHeader(true)}</div>
+            <div
+              data-tour="viewer"
+              className="mt-1.5 aspect-square w-full overflow-hidden rounded-md border border-border/60 bg-card"
+            >
+              {renderViewerContent()}
+            </div>
+          </>
+        )}
       </div>
     );
   };
@@ -813,7 +901,7 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
       <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         {/* Left Panel - Survey Form */}
         <div className="flex min-h-0 w-full flex-col border-b border-border/60 bg-card md:w-[28%] md:max-w-md md:border-b-0 md:border-r lg:w-[26%]">
-          <ScrollArea className="min-h-0 flex-1">
+          <ScrollArea className="min-h-0 flex-1 overscroll-contain">
             <div className="space-y-2.5 p-2">
               {step === "intro" ? (
                 <>

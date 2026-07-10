@@ -18,6 +18,7 @@ import { FloorPlanViewer } from "./floor-plan-viewer";
 import { MapViewer } from "./map-viewer";
 import { SURVEY_QUESTIONS, PRIORITIZATION_CATEGORIES, DONT_KNOW_RATING, isRatingScored, formatRatingDisplay, type SurveyData } from "@/lib/survey-data";
 import type { SurveySubmissionPayload } from "@/lib/submit-survey";
+import { clearSurveyDraft } from "@/lib/survey-draft";
 import { getSchoolByName } from "@/lib/schools-data";
 import { getSpaceColor } from "@/lib/spaces-data";
 import {
@@ -204,6 +205,7 @@ export function ReportView({
 
       setSubmissionId(result.submissionId);
       setSubmitted(true);
+      clearSurveyDraft();
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Failed to submit survey."
