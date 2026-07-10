@@ -3,7 +3,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import {
   SURVEY_QUESTIONS,
@@ -205,36 +204,10 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
                 </span>
               </div>
 
-              {isFca ? (
-                <>
-                  <p className="text-[9px] text-muted-foreground">
-                    1 = Strongly Disagree · 3 = Neutral · 5 = Strongly Agree
-                  </p>
-                  <div className="flex justify-center">{renderRatingButtons("md")}</div>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-1.5">
-                    <Slider
-                      value={[Math.max(response.rating, 1)]}
-                      onValueChange={([value]) =>
-                        onChange({ ...response, rating: value })
-                      }
-                      min={1}
-                      max={5}
-                      step={1}
-                      className="w-full"
-                      disabled={response.rating === DONT_KNOW_RATING}
-                    />
-                    <div className="flex justify-between text-[9px] text-muted-foreground">
-                      <span>1 - Very Poor</span>
-                      <span>3 - Adequate</span>
-                      <span>5 - Excellent</span>
-                    </div>
-                  </div>
-                  <div className="flex justify-center">{renderRatingButtons("md")}</div>
-                </>
-              )}
+              <p className="text-[9px] text-muted-foreground">
+                1 = Strongly Disagree · 3 = Neutral · 5 = Strongly Agree
+              </p>
+              <div className="flex justify-center">{renderRatingButtons("md")}</div>
             </div>
 
             <div className="space-y-1" data-tour="explanation">

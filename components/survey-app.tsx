@@ -965,7 +965,7 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
                             <p className="text-[11px] text-muted-foreground">
                               {currentPanel.section === "Facility Condition"
                                 ? FCA_LIKERT_SCALE_NOTE
-                                : "Rate each item from 1 (very poor) to 5 (excellent)."}
+                                : "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree)."}
                             </p>
                           </div>
                           {currentPanel.questions.map((q) => {

@@ -31,7 +31,7 @@ export const QUESTION_TOUR_STEPS: TourStep[] = [
   {
     target: "rating",
     title: "Rate each statement",
-    body: "Educational Suitability uses 1 (Very Poor) through 5 (Excellent). Use the slider or number buttons. Facility Condition (FCA) questions use a Likert scale from Strongly Disagree to Strongly Agree.",
+    body: "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree) using the number buttons. Facility Condition questions also include an “I don’t know” option.",
     placement: "right",
   },
   {

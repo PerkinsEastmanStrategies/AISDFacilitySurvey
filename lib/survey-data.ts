@@ -578,34 +578,18 @@ export function formatRatingDisplay(
   if (rating === DONT_KNOW_RATING) return "I don't know";
   if (rating <= 0) return "-";
 
-  if (section === "Facility Condition") {
-    switch (rating) {
-      case 1:
-        return "Strongly Disagree";
-      case 2:
-        return "Disagree";
-      case 3:
-        return "Neutral";
-      case 4:
-        return "Agree";
-      case 5:
-        return "Strongly Agree";
-      default:
-        return String(rating);
-    }
-  }
-
+  // ESA and FCA both use a Strongly Disagree → Strongly Agree Likert scale.
   switch (rating) {
     case 1:
-      return "Very Poor";
+      return "Strongly Disagree";
     case 2:
-      return "Poor";
+      return "Disagree";
     case 3:
-      return "Adequate";
+      return "Neutral";
     case 4:
-      return "Good";
+      return "Agree";
     case 5:
-      return "Excellent";
+      return "Strongly Agree";
     default:
       return String(rating);
   }
