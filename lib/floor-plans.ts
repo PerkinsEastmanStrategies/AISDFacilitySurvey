@@ -1,0 +1,187 @@
+import {
+  getAvailableFloors,
+  getDefaultFloorFilename,
+  type FloorLevelId,
+  type FloorPlanLevel,
+} from "@/lib/floor-plan-manifest";
+import { getSchoolByName } from "@/lib/schools-data";
+
+export type { FloorLevelId, FloorPlanLevel };
+export {
+  FLOOR_LEVELS,
+  FLOOR_PLAN_MANIFEST_PATH,
+  DEFAULT_FLOOR_PLAN_MANIFEST_URL,
+  getAvailableFloors,
+  getAvailableFloorsForSchool,
+  loadFloorPlanManifest,
+} from "@/lib/floor-plan-manifest";
+
+/**
+ * Legacy default filename: `{BUILDING_NAME} {SUFFIX}.svg`
+ * (e.g. `PILLOW ES.svg`). Used when manifest Floor 1 cell is empty.
+ */
+export function getFloorPlanFilename(buildingName: string): string | null {
+  return getDefaultFloorFilename(buildingName);
+}
+
+export function getFloorPlanPublicPathForFilename(filename: string): string {
+  return `/floor-plans/${encodeURIComponent(filename)}`;
+}
+
+/** Local public URL path for a school's default floor plan SVG. */
+export function getFloorPlanPublicPath(buildingName: string): string | null {
+  const filename = getFloorPlanFilename(buildingName);
+  if (!filename) return null;
+  return getFloorPlanPublicPathForFilename(filename);
+}
+
+/** Supabase Storage public URL for a floor plan SVG filename. */
+export function getSupabaseFloorPlanUrlForFilename(filename: string): string | null {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const bucket = process.env.NEXT_PUBLIC_SUPABASE_FLOOR_PLANS_BUCKET;
+  if (!supabaseUrl || !bucket || !filename) return null;
+
+  const base = supabaseUrl.replace(/\/$/, "");
+  return `${base}/storage/v1/object/public/${bucket}/${encodeURIComponent(filename)}`;
+}
+
+export function getSupabaseFloorPlanUrl(buildingName: string): string | null {
+  const filename = getFloorPlanFilename(buildingName);
+  if (!filename) return null;
+  return getSupabaseFloorPlanUrlForFilename(filename);
+}
+
+const svgCache = new Map<string, string>();
+const svgInflight = new Map<string, Promise<string | null>>();
+const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v1";
+
+async function openFloorPlanCache(): Promise<Cache | null> {
+  if (typeof window === "undefined" || !("caches" in window)) return null;
+  try {
+    return await caches.open(FLOOR_PLAN_CACHE_NAME);
+  } catch {
+    return null;
+  }
+}
+
+async function readCachedFloorPlan(url: string): Promise<string | null> {
+  const cache = await openFloorPlanCache();
+  if (!cache) return null;
+
+  try {
+    const response = await cache.match(url);
+    if (!response?.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  }
+}
+
+async function writeCachedFloorPlan(url: string, svgText: string): Promise<void> {
+  const cache = await openFloorPlanCache();
+  if (!cache) return;
+
+  try {
+    await cache.put(
+      url,
+      new Response(svgText, {
+        headers: { "Content-Type": "image/svg+xml" },
+      })
+    );
+  } catch {
+    // Quota exceeded or storage unavailable — memory cache still applies.
+  }
+}
+
+async function fetchFloorPlanSvgFromSources(
+  filename: string,
+  fallbackSvg?: string | null
+): Promise<string | null> {
+  const sources = [
+    getSupabaseFloorPlanUrlForFilename(filename),
+    getFloorPlanPublicPathForFilename(filename),
+  ].filter((url): url is string => Boolean(url));
+
+  for (const url of sources) {
+    const cached = await readCachedFloorPlan(url);
+    if (cached) return cached;
+  }
+
+  for (const url of sources) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+
+      const text = await response.text();
+      void writeCachedFloorPlan(url, text);
+      return text;
+    } catch {
+      // Try the next source.
+    }
+  }
+
+  return fallbackSvg ?? null;
+}
+
+export async function fetchFloorPlanSvgByFilename(
+  filename: string,
+  fallbackSvg?: string | null
+): Promise<string | null> {
+  if (!filename) return fallbackSvg ?? null;
+
+  const cached = svgCache.get(filename);
+  if (cached) return cached;
+
+  let inflight = svgInflight.get(filename);
+  if (!inflight) {
+    inflight = fetchFloorPlanSvgFromSources(filename, fallbackSvg).finally(() => {
+      svgInflight.delete(filename);
+    });
+    svgInflight.set(filename, inflight);
+  }
+
+  const svg = await inflight;
+  if (svg && svg !== fallbackSvg) {
+    svgCache.set(filename, svg);
+  }
+
+  return svg;
+}
+
+/** Warm the cache for other floors without blocking the UI. */
+export function prefetchFloorPlanSvgs(filenames: string[]): void {
+  for (const filename of filenames) {
+    if (!filename || svgCache.has(filename) || svgInflight.has(filename)) continue;
+    void fetchFloorPlanSvgByFilename(filename);
+  }
+}
+
+export async function fetchFloorPlanSvgForLevel(
+  buildingName: string,
+  floor: FloorPlanLevel,
+  fallbackSvg?: string | null
+): Promise<string | null> {
+  if (!getSchoolByName(buildingName)) return fallbackSvg ?? null;
+  return fetchFloorPlanSvgByFilename(floor.filename, fallbackSvg);
+}
+
+/** Load the default/first available floor for a school. */
+export async function fetchFloorPlanSvg(
+  buildingName: string,
+  fallbackSvg?: string | null
+): Promise<string | null> {
+  const floors = await getAvailableFloors(buildingName);
+  if (floors.length === 0) return fallbackSvg ?? null;
+  return fetchFloorPlanSvgForLevel(buildingName, floors[0], fallbackSvg);
+}
+
+export async function fetchFloorPlanSvgForFloorId(
+  buildingName: string,
+  floorId: FloorLevelId,
+  fallbackSvg?: string | null
+): Promise<string | null> {
+  const floors = await getAvailableFloors(buildingName);
+  const floor = floors.find((entry) => entry.id === floorId) ?? floors[0];
+  if (!floor) return fallbackSvg ?? null;
+  return fetchFloorPlanSvgForLevel(buildingName, floor, fallbackSvg);
+}
