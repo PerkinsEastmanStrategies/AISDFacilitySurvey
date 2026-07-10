@@ -299,9 +299,16 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
         : defaultSvg;
       if (cancelled) return;
 
-      prefetchFloorPlanSvgs(
-        floors.slice(1).map((floor) => floor.filename).filter(Boolean)
-      );
+      // Prefetching every floor doubles memory; skip on phones.
+      const isPhone =
+        typeof window !== "undefined" &&
+        (window.matchMedia("(max-width: 767px)").matches ||
+          window.matchMedia("(pointer: coarse)").matches);
+      if (!isPhone) {
+        prefetchFloorPlanSvgs(
+          floors.slice(1).map((floor) => floor.filename).filter(Boolean)
+        );
+      }
 
       setSurveyData((prev) => {
         if (prev.school !== surveyData.school) return prev;

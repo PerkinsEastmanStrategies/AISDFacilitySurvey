@@ -443,9 +443,17 @@ function parseCafmTextLabel(
   };
 }
 
+const cafmLabelCache = new WeakMap<SVGSVGElement, CafmLabel[]>();
+
 function getCafmLabels(svgRoot: SVGSVGElement): CafmLabel[] {
+  const cached = cafmLabelCache.get(svgRoot);
+  if (cached) return cached;
+
   const cafmId = svgRoot.querySelector("#CAFM_ID");
-  if (!cafmId) return [];
+  if (!cafmId) {
+    cafmLabelCache.set(svgRoot, []);
+    return [];
+  }
 
   const labels: CafmLabel[] = [];
   for (const textEl of Array.from(cafmId.querySelectorAll("text"))) {
@@ -453,6 +461,7 @@ function getCafmLabels(svgRoot: SVGSVGElement): CafmLabel[] {
     if (label) labels.push(label);
   }
 
+  cafmLabelCache.set(svgRoot, labels);
   return labels;
 }
 
@@ -562,9 +571,14 @@ export function logCafmFloorPlanAudit(
 
 function getPlanDistanceScale(svgRoot: SVGSVGElement): number {
   const viewBox = svgRoot.viewBox.baseVal;
-  const planWidth = viewBox.width > 0 ? viewBox.width : svgRoot.getBBox().width;
-  const planHeight = viewBox.height > 0 ? viewBox.height : svgRoot.getBBox().height;
-  return Math.max(planWidth, planHeight);
+  if (viewBox.width > 0 && viewBox.height > 0) {
+    return Math.max(viewBox.width, viewBox.height);
+  }
+  // Avoid getBBox() on the full plan — it can OOM large CAFM SVGs on mobile.
+  const w = parseFloat(svgRoot.getAttribute("width") || "0");
+  const h = parseFloat(svgRoot.getAttribute("height") || "0");
+  if (w > 0 && h > 0) return Math.max(w, h);
+  return 1000;
 }
 
 function findNearestLabel(
@@ -1267,8 +1281,125 @@ export function findRoomMatchAtSvgPoint(
   clientX: number,
   clientY: number
 ): RoomMatchResult {
+  const cafmSpace = svgRoot.querySelector("#CAFM_SPACE");
+
+  // Fast path: use the browser hit-test stack instead of getBBox() on every
+  // CAFM shape (that full scan OOMs phones on the first pin tap).
+  if (cafmSpace && typeof document !== "undefined") {
+    const hit = findCafmShapeFromElementsAtPoint(
+      svgRoot,
+      cafmSpace,
+      clientX,
+      clientY
+    );
+    if (hit) {
+      const { x, y } = clientToSvgPoint(svgRoot, clientX, clientY);
+      const labels = getCafmLabels(svgRoot);
+      const room =
+        labels.length > 0
+          ? roomFromHitShape(svgRoot, hit, labels, x, y)
+          : null;
+      let highlightPoints: { x: number; y: number }[] | null = null;
+      try {
+        const points = getShapePointsInRootSpace(hit, svgRoot);
+        if (points.length >= 3) highlightPoints = points;
+      } catch {
+        highlightPoints = room && room.points.length >= 3 ? room.points : null;
+      }
+      return {
+        room,
+        highlightPoints,
+        highlightElement: hit,
+      };
+    }
+  }
+
   const { x, y } = clientToSvgPoint(svgRoot, clientX, clientY);
+
+  // On phones, never fall back to scanning every CAFM shape with getBBox().
+  const isPhone =
+    typeof window !== "undefined" &&
+    (window.matchMedia("(max-width: 767px)").matches ||
+      window.matchMedia("(pointer: coarse)").matches);
+  if (isPhone) {
+    const labels = getCafmLabels(svgRoot);
+    const room = pickCafmRoomAtPoint(svgRoot, labels, x, y);
+    return { room, highlightPoints: null, highlightElement: null };
+  }
+
   return findRoomMatchAtSvgCoordinates(svgRoot, x, y);
+}
+
+function findCafmShapeFromElementsAtPoint(
+  svgRoot: SVGSVGElement,
+  cafmSpace: Element,
+  clientX: number,
+  clientY: number
+): SVGGraphicsElement | null {
+  const stack = document.elementsFromPoint(clientX, clientY);
+  for (const node of stack) {
+    if (!(node instanceof SVGGraphicsElement)) continue;
+    if (!cafmSpace.contains(node)) continue;
+    if (!node.matches("path, polygon, polyline, rect")) continue;
+    // Ignore tiny decorative marks
+    try {
+      const box = node.getBBox();
+      if (box.width <= 0 || box.height <= 0) continue;
+    } catch {
+      continue;
+    }
+    return node;
+  }
+  return null;
+}
+
+function roomFromHitShape(
+  svgRoot: SVGSVGElement,
+  shape: SVGGraphicsElement,
+  labels: CafmLabel[],
+  clickX: number,
+  clickY: number
+): RoomInfo | null {
+  try {
+    const points = getShapePointsInRootSpace(shape, svgRoot);
+    const bbox = bboxFromPoints(points);
+    const region: CafmSpaceRegion = {
+      element: shape,
+      points,
+      bbox,
+      area: Math.max(bbox.width * bbox.height, 1),
+      closed: isClosedShape(shape, getGraphicsPolygonPoints(shape)),
+      labels: labels.filter((label) =>
+        regionContainsPoint(
+          {
+            element: shape,
+            points,
+            bbox,
+            area: Math.max(bbox.width * bbox.height, 1),
+            closed: true,
+            labels: [],
+          },
+          label.x,
+          label.y
+        )
+      ),
+    };
+
+    const resolved = resolveRegionLabels(region.labels, clickX, clickY);
+    if (resolved) {
+      return {
+        key: resolved.key,
+        label: resolved.label,
+        x: resolved.x,
+        y: resolved.y,
+        points: region.points,
+      };
+    }
+  } catch {
+    // fall through
+  }
+
+  return pickCafmRoomAtPoint(svgRoot, labels, clickX, clickY);
 }
 
 export function findRoomMatchAtSvgCoordinates(

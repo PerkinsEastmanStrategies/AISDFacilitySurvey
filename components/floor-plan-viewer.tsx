@@ -114,17 +114,20 @@ export function FloorPlanViewer({
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
   const [viewBox, setViewBox] = useState<ViewBox | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [processedSvg, setProcessedSvg] = useState<string | null>(null);
+  /** Bumps when a new SVG should be mounted into the host (avoids keeping a second full SVG string in React state). */
+  const [svgMountKey, setSvgMountKey] = useState(0);
+  const pendingSvgRef = useRef<SVGSVGElement | null>(null);
+  const [svgReady, setSvgReady] = useState(false);
 
-  const auditIdleRef = useRef<number | null>(null);
-
-  // Parse SVG, crop to content bounds, and mount inline for accurate hit-testing.
+  // Parse SVG and prepare for mount — do not serializeToString (doubles memory on large CAFM plans).
   useEffect(() => {
     if (!svgContent) {
-      setProcessedSvg(null);
+      pendingSvgRef.current = null;
       setViewBox(null);
       setHighlightPolygon(null);
+      setSvgReady(false);
       svgRef.current = null;
+      setSvgMountKey((k) => k + 1);
       return;
     }
 
@@ -139,8 +142,10 @@ export function FloorPlanViewer({
       const svgElement = doc.querySelector("svg");
 
       if (!svgElement) {
-        setProcessedSvg(null);
+        pendingSvgRef.current = null;
         setViewBox(null);
+        setSvgReady(false);
+        setSvgMountKey((k) => k + 1);
         return;
       }
 
@@ -153,62 +158,73 @@ export function FloorPlanViewer({
       }
 
       enhanceFloorPlanLineContrast(svgElement, doc);
-
-      setProcessedSvg(new XMLSerializer().serializeToString(svgElement));
+      pendingSvgRef.current = svgElement;
+      setSvgReady(true);
+      setSvgMountKey((k) => k + 1);
     };
 
-    const frameId = requestAnimationFrame(processSvg);
+    // Yield so the "Show floor plan" tap can paint before heavy parse work.
+    const timer = window.setTimeout(processSvg, 0);
     return () => {
       cancelled = true;
-      cancelAnimationFrame(frameId);
+      window.clearTimeout(timer);
     };
   }, [svgContent]);
 
   useEffect(() => {
-    if (!processedSvg || !svgHostRef.current) {
+    if (!svgHostRef.current) {
       svgRef.current = null;
       return;
     }
 
-    svgHostRef.current.innerHTML = processedSvg;
-    const svgElement = svgHostRef.current.querySelector("svg");
-    if (svgElement) {
-      svgElement.setAttribute("width", "100%");
-      svgElement.setAttribute("height", "100%");
-      svgRef.current = svgElement;
-
-      if (process.env.NODE_ENV !== "production") {
-        const runAudit = () => {
-          if (svgRef.current) {
-            logCafmFloorPlanAudit(svgRef.current, buildingName);
-          }
-        };
-
-        if (typeof window !== "undefined" && "requestIdleCallback" in window) {
-          auditIdleRef.current = window.requestIdleCallback(runAudit, {
-            timeout: 4000,
-          });
-        } else {
-          auditIdleRef.current = window.setTimeout(runAudit, 150);
-        }
-      }
-    } else {
+    svgHostRef.current.replaceChildren();
+    const source = pendingSvgRef.current;
+    if (!source || !svgReady) {
       svgRef.current = null;
+      return;
     }
 
-    setHighlightPolygon(null);
+    const mounted = document.importNode(source, true) as SVGSVGElement;
+    mounted.setAttribute("width", "100%");
+    mounted.setAttribute("height", "100%");
+    mounted.style.maxWidth = "100%";
+    mounted.style.maxHeight = "100%";
+    svgHostRef.current.appendChild(mounted);
+    svgRef.current = mounted;
+    // Drop the parse-tree copy once mounted so phones aren't holding two full DOMs.
+    pendingSvgRef.current = null;
 
-    return () => {
-      if (auditIdleRef.current !== null) {
-        if (typeof window !== "undefined" && "cancelIdleCallback" in window) {
-          window.cancelIdleCallback(auditIdleRef.current);
-        } else {
-          window.clearTimeout(auditIdleRef.current);
-        }
-        auditIdleRef.current = null;
+    setHighlightPolygon(null);
+  }, [svgMountKey, svgReady]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (!svgRef.current) return;
+
+    const runAudit = () => {
+      if (svgRef.current) {
+        logCafmFloorPlanAudit(svgRef.current, buildingName);
       }
     };
-  }, [processedSvg, buildingName]);
+
+    let idleHandle: number | null = null;
+    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      idleHandle = window.requestIdleCallback(runAudit, { timeout: 4000 });
+    } else {
+      timeoutHandle = setTimeout(runAudit, 150);
+    }
+
+    return () => {
+      if (idleHandle !== null && "cancelIdleCallback" in window) {
+        window.cancelIdleCallback(idleHandle);
+      }
+      if (timeoutHandle !== null) {
+        clearTimeout(timeoutHandle);
+      }
+    };
+  }, [svgMountKey, svgReady, buildingName]);
 
   // Track container size
   useEffect(() => {
@@ -1081,7 +1097,7 @@ export function FloorPlanViewer({
         onWheel={handleWheel}
         style={{ cursor: getCursor() }}
       >
-        {processedSvg && viewBox ? (
+        {svgReady && viewBox ? (
           <>
             {/* Inline SVG for accurate coordinate mapping and room hit-testing */}
             <div

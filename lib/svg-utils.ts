@@ -5,8 +5,19 @@ export interface SvgViewBox {
   height: number;
 }
 
-/** Above this size, skip getBBox-based cropping when a viewBox is already declared. */
-export const LARGE_SVG_CHAR_THRESHOLD = 9 * 1024 * 1024;
+/**
+ * Above this size, skip getBBox-based cropping (cloning the SVG into the DOM).
+ * CAFM plans are often multi-MB; the clone pass OOMs mobile Safari.
+ */
+export const LARGE_SVG_CHAR_THRESHOLD = 512 * 1024;
+
+function isCoarsePointerDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  return (
+    window.matchMedia("(pointer: coarse)").matches ||
+    window.matchMedia("(max-width: 767px)").matches
+  );
+}
 
 export function parseSvgViewBoxAttribute(
   svgElement: SVGSVGElement
@@ -69,17 +80,21 @@ export function getTightSvgViewBox(
   }
 }
 
-/** Prefer declared viewBox on very large SVGs to avoid an extra DOM measurement pass. */
+/**
+ * Prefer declared viewBox on large SVGs and phones to avoid an extra full-DOM
+ * clone + getBBox pass (a common mobile tab-kill).
+ */
 export function resolveSvgViewBox(
   svgElement: SVGSVGElement,
   sourceCharLength?: number
 ): SvgViewBox | null {
   const declared = parseSvgViewBoxAttribute(svgElement);
-  if (
-    sourceCharLength !== undefined &&
-    sourceCharLength >= LARGE_SVG_CHAR_THRESHOLD &&
-    declared
-  ) {
+  const skipTightCrop =
+    isCoarsePointerDevice() ||
+    (sourceCharLength !== undefined &&
+      sourceCharLength >= LARGE_SVG_CHAR_THRESHOLD);
+
+  if (skipTightCrop) {
     return declared;
   }
 
