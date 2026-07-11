@@ -27,6 +27,7 @@ import {
   prefetchFloorPlanSvgs,
   type FloorPlanLevel,
 } from "@/lib/floor-plans";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   BarChart3,
   TrendingUp,
@@ -69,6 +70,7 @@ export function ReportView({
   const [activeFloorId, setActiveFloorId] = useState("floor-1");
   const [reportSvgContent, setReportSvgContent] = useState(data.svgContent);
   const [floorPlanLoading, setFloorPlanLoading] = useState(false);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     let cancelled = false;
@@ -91,12 +93,15 @@ export function ReportView({
       if (initialFloor) {
         const svg = await fetchFloorPlanSvgByFilename(
           initialFloor.filename,
-          data.svgContent
+          data.svgContent,
+          { preferMobile: isMobile }
         );
         if (!cancelled) setReportSvgContent(svg);
-        prefetchFloorPlanSvgs(
-          floors.slice(1).map((floor) => floor.filename).filter(Boolean)
-        );
+        if (!isMobile) {
+          prefetchFloorPlanSvgs(
+            floors.slice(1).map((floor) => floor.filename).filter(Boolean)
+          );
+        }
       } else if (!cancelled) {
         setReportSvgContent(data.svgContent);
       }
@@ -108,7 +113,7 @@ export function ReportView({
     return () => {
       cancelled = true;
     };
-  }, [data.school, data.svgContent]);
+  }, [data.school, data.svgContent, isMobile]);
 
   const handleFloorChange = useCallback(
     async (floorId: string) => {
@@ -116,11 +121,15 @@ export function ReportView({
       if (!floor) return;
       setActiveFloorId(floorId);
       setFloorPlanLoading(true);
-      const svg = await fetchFloorPlanSvgByFilename(floor.filename, data.svgContent);
+      const svg = await fetchFloorPlanSvgByFilename(
+        floor.filename,
+        data.svgContent,
+        { preferMobile: isMobile }
+      );
       setReportSvgContent(svg);
       setFloorPlanLoading(false);
     },
-    [availableFloors, data.svgContent]
+    [availableFloors, data.svgContent, isMobile]
   );
 
   const completedResponses = data.responses.filter((r) => isRatingScored(r.rating));

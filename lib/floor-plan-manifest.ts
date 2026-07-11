@@ -144,6 +144,20 @@ export async function loadFloorPlanManifest(
 
   manifestLoadPromise = (async () => {
     try {
+      // Local CSV first in development so mobile `*.mobile.svg` test files
+      // (e.g. Zilker L1/LM) are used without waiting on the live sheet.
+      if (process.env.NODE_ENV === "development") {
+        const localCsv = await fetchManifestCsv(FLOOR_PLAN_MANIFEST_PATH);
+        if (localCsv) {
+          const localRows = parseManifestCsv(localCsv);
+          if (localRows.length > 0) {
+            manifestCache = localRows;
+            manifestLoadedSuccessfully = true;
+            return manifestCache;
+          }
+        }
+      }
+
       const liveCsv = await fetchManifestCsv(getManifestUrl());
       if (liveCsv) {
         const liveRows = parseManifestCsv(liveCsv);

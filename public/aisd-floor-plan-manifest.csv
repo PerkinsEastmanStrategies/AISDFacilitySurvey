@@ -1,4 +1,4 @@
-﻿school_name,school_level,class_code,campus_id,Basement,Floor 1,Floor 2,Floor 3,Floor 4,Floor 5
+﻿school_name,school_level,class_code,campus_id,Basement,Floor 1,Floor 2,Floor 3,Floor 4,Floor 5,Mezzanine
 AISD CENTRAL,District Facility,DISTRICT,968,,AISD CENTRAL DIST.svg,,,,
 AKINS,High School,HIGH,017,,AKINS HS.svg,,,,
 ALC,Alternative Education,ALT ED 1,012,,ALC ALT.svg,,,,
@@ -133,4 +133,4 @@ WINN,Elementary School,ELEM,157,,WINN ES.svg,,,,
 WOOLDRIDGE,Elementary School,ELEM,152,,WOOLDRIDGE ES.svg,,,,
 WOOTEN,Elementary School,ELEM,144,,WOOTEN ES.svg,,,,
 ZAVALA,Elementary School,ELEM,145,,ZAVALA ES.svg,,,,
-ZILKER,Elementary School,ELEM,146,,ZILKER ES.svg,,,,
+ZILKER,Elementary School,ELEM,146,,ZILKER ES L1.svg,,,,,ZILKER ES LM.svg

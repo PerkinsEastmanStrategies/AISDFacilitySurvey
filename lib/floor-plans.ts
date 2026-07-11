@@ -28,6 +28,16 @@ export function getFloorPlanPublicPathForFilename(filename: string): string {
   return `/floor-plans/${encodeURIComponent(filename)}`;
 }
 
+/**
+ * Lightweight mobile variant naming: `SCHOOL L1.svg` → `SCHOOL L1.mobile.svg`.
+ * Desktop keeps the original filename from the manifest.
+ */
+export function toMobileFloorPlanFilename(filename: string): string {
+  if (!filename) return filename;
+  if (/\.mobile\.svg$/i.test(filename)) return filename;
+  return filename.replace(/\.svg$/i, ".mobile.svg");
+}
+
 /** Local public URL path for a school's default floor plan SVG. */
 export function getFloorPlanPublicPath(buildingName: string): string | null {
   const filename = getFloorPlanFilename(buildingName);
@@ -94,8 +104,7 @@ async function writeCachedFloorPlan(url: string, svgText: string): Promise<void>
 }
 
 async function fetchFloorPlanSvgFromSources(
-  filename: string,
-  fallbackSvg?: string | null
+  filename: string
 ): Promise<string | null> {
   const sources = [
     getSupabaseFloorPlanUrlForFilename(filename),
@@ -120,32 +129,41 @@ async function fetchFloorPlanSvgFromSources(
     }
   }
 
-  return fallbackSvg ?? null;
+  return null;
 }
 
 export async function fetchFloorPlanSvgByFilename(
   filename: string,
-  fallbackSvg?: string | null
+  fallbackSvg?: string | null,
+  options?: { preferMobile?: boolean }
 ): Promise<string | null> {
   if (!filename) return fallbackSvg ?? null;
 
-  const cached = svgCache.get(filename);
-  if (cached) return cached;
+  const candidates = options?.preferMobile
+    ? [toMobileFloorPlanFilename(filename), filename]
+    : [filename];
+  const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
 
-  let inflight = svgInflight.get(filename);
-  if (!inflight) {
-    inflight = fetchFloorPlanSvgFromSources(filename, fallbackSvg).finally(() => {
-      svgInflight.delete(filename);
-    });
-    svgInflight.set(filename, inflight);
+  for (const candidate of uniqueCandidates) {
+    const cached = svgCache.get(candidate);
+    if (cached) return cached;
+
+    let inflight = svgInflight.get(candidate);
+    if (!inflight) {
+      inflight = fetchFloorPlanSvgFromSources(candidate).finally(() => {
+        svgInflight.delete(candidate);
+      });
+      svgInflight.set(candidate, inflight);
+    }
+
+    const svg = await inflight;
+    if (svg) {
+      svgCache.set(candidate, svg);
+      return svg;
+    }
   }
 
-  const svg = await inflight;
-  if (svg && svg !== fallbackSvg) {
-    svgCache.set(filename, svg);
-  }
-
-  return svg;
+  return fallbackSvg ?? null;
 }
 
 /** Warm the cache for other floors without blocking the UI. */

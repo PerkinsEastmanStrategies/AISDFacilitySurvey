@@ -272,6 +272,7 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
   }, [isSpacesQuestion]);
 
   // Load floor plan manifest + default floor when a school is selected.
+  // On phones, prefer `*.mobile.svg` when present; desktop keeps the full plan.
   useEffect(() => {
     let cancelled = false;
 
@@ -295,16 +296,14 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
       setFloorPlanLoading(true);
 
       const svg = initialFloor
-        ? await fetchFloorPlanSvgByFilename(initialFloor.filename, defaultSvg)
+        ? await fetchFloorPlanSvgByFilename(initialFloor.filename, defaultSvg, {
+            preferMobile: isMobile,
+          })
         : defaultSvg;
       if (cancelled) return;
 
       // Prefetching every floor doubles memory; skip on phones.
-      const isPhone =
-        typeof window !== "undefined" &&
-        (window.matchMedia("(max-width: 767px)").matches ||
-          window.matchMedia("(pointer: coarse)").matches);
-      if (!isPhone) {
+      if (!isMobile) {
         prefetchFloorPlanSvgs(
           floors.slice(1).map((floor) => floor.filename).filter(Boolean)
         );
@@ -327,7 +326,7 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
       cancelled = true;
       setFloorPlanLoading(false);
     };
-  }, [surveyData.school, defaultSvg]);
+  }, [surveyData.school, defaultSvg, isMobile]);
 
   const handleFloorChange = useCallback(
     async (floorId: string) => {
@@ -336,11 +335,13 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
 
       setActiveFloorId(floorId);
       setFloorPlanLoading(true);
-      const svg = await fetchFloorPlanSvgByFilename(floor.filename, defaultSvg);
+      const svg = await fetchFloorPlanSvgByFilename(floor.filename, defaultSvg, {
+        preferMobile: isMobile,
+      });
       setSurveyData((prev) => ({ ...prev, svgContent: svg }));
       setFloorPlanLoading(false);
     },
-    [availableFloors, defaultSvg]
+    [availableFloors, defaultSvg, isMobile]
   );
 
   const selectedSchool = getSchoolByName(surveyData.school);
