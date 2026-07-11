@@ -30,6 +30,7 @@ import {
 } from "@/lib/svg-utils";
 import type { Tool, Classification } from "@/components/annotation-toolbar";
 import type { FloorPlanLevel } from "@/lib/floor-plans";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface SpaceLabel {
   label: string;
@@ -96,6 +97,7 @@ export function FloorPlanViewer({
   isLoading = false,
   loadingMessage,
 }: FloorPlanViewerProps) {
+  const isMobile = useIsMobile();
   const containerRef = useRef<HTMLDivElement>(null);
   const svgHostRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -157,7 +159,9 @@ export function FloorPlanViewer({
         setViewBox(null);
       }
 
-      enhanceFloorPlanLineContrast(svgElement, doc);
+      enhanceFloorPlanLineContrast(svgElement, doc, {
+        boost: isMobile ? "mobile" : "default",
+      });
       pendingSvgRef.current = svgElement;
       setSvgReady(true);
       setSvgMountKey((k) => k + 1);
@@ -169,7 +173,7 @@ export function FloorPlanViewer({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [svgContent]);
+  }, [svgContent, isMobile]);
 
   useEffect(() => {
     if (!svgHostRef.current) {
