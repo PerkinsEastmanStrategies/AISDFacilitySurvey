@@ -153,7 +153,7 @@ export function enhanceFloorPlanLineContrast(
         stroke: #000000 !important;
         stroke-opacity: 1 !important;
         vector-effect: non-scaling-stroke !important;
-        stroke-width: 1.75px !important;
+        stroke-width: 1.25px !important;
       }
       #CAFM_SPACE path,
       #CAFM_SPACE rect,
@@ -164,7 +164,7 @@ export function enhanceFloorPlanLineContrast(
         stroke: #000000 !important;
         stroke-opacity: 1 !important;
         vector-effect: non-scaling-stroke !important;
-        stroke-width: 2px !important;
+        stroke-width: 1.4px !important;
       }
       text,
       text tspan {
@@ -172,7 +172,7 @@ export function enhanceFloorPlanLineContrast(
         stroke-opacity: 0.95 !important;
         fill: #1a1a1a !important;
         vector-effect: non-scaling-stroke !important;
-        stroke-width: 0.6px !important;
+        stroke-width: 0.5px !important;
       }
     `;
   } else {
