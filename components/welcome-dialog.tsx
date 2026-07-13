@@ -78,6 +78,17 @@ export function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
             details that only you and your team can share.
           </p>
 
+          <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 dark:border-amber-900/50 dark:bg-amber-950/40">
+            <p className="text-sm font-semibold text-foreground">
+              Best experienced on a computer
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              This survey works on mobile devices, but for full functionality and
+              the best experience — especially floor plans, maps, and annotations —
+              please complete it on a computer when you can.
+            </p>
+          </div>
+
           <div className="rounded-xl border border-border/60 bg-muted/30 p-4">
             <p className="text-sm font-medium text-foreground">
               Mark your campus as you go
