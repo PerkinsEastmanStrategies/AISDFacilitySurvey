@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useLayoutEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,11 @@ import {
   saveSurveyDraft,
   type SurveyStep,
 } from "@/lib/survey-draft";
+import {
+  seedFloorPlanManifest,
+  type FloorPlanManifestRow,
+  type ManifestSchoolOption,
+} from "@/lib/floor-plan-manifest";
 import Image from "next/image";
 
 type Step = SurveyStep;
@@ -88,7 +93,15 @@ function SurveyCredit() {
   );
 }
 
-export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
+export default function SurveyApp({
+  defaultSvg,
+  initialManifest = [],
+  initialSchools = [],
+}: {
+  defaultSvg: string;
+  initialManifest?: FloorPlanManifestRow[];
+  initialSchools?: ManifestSchoolOption[];
+}) {
   const [step, setStep] = useState<Step>("intro");
   const [currentPanelIndex, setCurrentPanelIndex] = useState(0);
   const [annotationTool, setAnnotationTool] = useState<Tool>("pan");
@@ -113,6 +126,13 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
   const isMobile = useIsMobile();
   const { ready: floorPlanDeviceReady, preferMobile } =
     usePrefersMobileFloorPlan();
+
+  useLayoutEffect(() => {
+    if (initialManifest.length > 0) {
+      seedFloorPlanManifest(initialManifest);
+    }
+  }, [initialManifest]);
+
   const [surveyData, setSurveyData] = useState<SurveyData>({
     school: "",
     role: "",
@@ -928,6 +948,7 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
                       specialEducation: surveyData.specialEducation,
                     }}
                     onChange={handleIntroChange}
+                    initialSchools={initialSchools}
                   />
                   {renderMobileViewerWindow()}
                 </>

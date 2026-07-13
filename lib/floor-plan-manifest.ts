@@ -74,7 +74,7 @@ function parseCsvLine(line: string): string[] {
   return values;
 }
 
-function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
+export function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
   const lines = csvText
     .replace(/^\uFEFF/, "")
     .split(/\r?\n/)
@@ -147,6 +147,14 @@ function rowsFromCsv(csvText: string | null): FloorPlanManifestRow[] {
   return parseManifestCsv(csvText);
 }
 
+/** Seed the in-memory cache from SSR so the dropdown never waits on a client fetch. */
+export function seedFloorPlanManifest(rows: FloorPlanManifestRow[]): void {
+  if (!rows.length) return;
+  manifestCache = rows;
+  manifestLoadedSuccessfully = true;
+  manifestLoadPromise = null;
+}
+
 export async function loadFloorPlanManifest(
   forceReload = false
 ): Promise<FloorPlanManifestRow[]> {
@@ -158,8 +166,8 @@ export async function loadFloorPlanManifest(
       // Priority 1: filtered Google Sheet via same-origin API (server fetches the
       // sheet so browser/network filters blocking docs.google.com do not matter).
       const apiRows = await fetchManifestCsv(
-        FLOOR_PLAN_MANIFEST_API_PATH,
-        15000
+        `${FLOOR_PLAN_MANIFEST_API_PATH}?t=${Date.now()}`,
+        10000
       ).then(rowsFromCsv);
       if (apiRows.length > 0) {
         manifestCache = apiRows;
@@ -170,7 +178,7 @@ export async function loadFloorPlanManifest(
       // Priority 2: bundled public CSV (last resort).
       const localRows = await fetchManifestCsv(
         FLOOR_PLAN_MANIFEST_PATH,
-        5000
+        4000
       ).then(rowsFromCsv);
       if (localRows.length > 0) {
         manifestCache = localRows;

@@ -1,12 +1,27 @@
+import {
+  loadManifestServer,
+  toManifestSchoolOptions,
+} from "@/lib/floor-plan-manifest-server";
 import { readFile } from "fs/promises";
 import path from "path";
 import SurveyApp from "@/components/survey-app";
 
-export default async function Page() {
-  const defaultSvg = await readFile(
-    path.join(process.cwd(), "public/floor-plans/default-plan.svg"),
-    "utf-8"
-  );
+export const dynamic = "force-dynamic";
 
-  return <SurveyApp defaultSvg={defaultSvg} />;
+export default async function Page() {
+  const [defaultSvg, manifest] = await Promise.all([
+    readFile(
+      path.join(process.cwd(), "public/floor-plans/default-plan.svg"),
+      "utf-8"
+    ),
+    loadManifestServer(),
+  ]);
+
+  return (
+    <SurveyApp
+      defaultSvg={defaultSvg}
+      initialManifest={manifest.rows}
+      initialSchools={toManifestSchoolOptions(manifest.rows)}
+    />
+  );
 }

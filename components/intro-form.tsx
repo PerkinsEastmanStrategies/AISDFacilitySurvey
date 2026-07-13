@@ -31,22 +31,34 @@ interface SchoolInfo {
 interface IntroFormProps {
   data: SchoolInfo;
   onChange: (data: SchoolInfo) => void;
+  /** Prefetched from the server (filtered Google Sheet). Avoids client Loading state. */
+  initialSchools?: ManifestSchoolOption[];
 }
 
-export function IntroForm({ data, onChange }: IntroFormProps) {
+export function IntroForm({
+  data,
+  onChange,
+  initialSchools = [],
+}: IntroFormProps) {
   const [manifestSchools, setManifestSchools] = useState<
     ManifestSchoolOption[] | null
-  >(null);
+  >(initialSchools.length > 0 ? initialSchools : null);
 
   useEffect(() => {
     let cancelled = false;
+
+    // If SSR already gave us schools, keep them and only replace if a newer
+    // client fetch returns a non-empty list (filtered sheet refresh).
     loadManifestSchoolOptions()
       .then((schools) => {
-        if (!cancelled) setManifestSchools(schools);
+        if (cancelled || schools.length === 0) return;
+        setManifestSchools(schools);
       })
       .catch(() => {
-        if (!cancelled) setManifestSchools([]);
+        if (cancelled) return;
+        setManifestSchools((prev) => prev ?? []);
       });
+
     return () => {
       cancelled = true;
     };
