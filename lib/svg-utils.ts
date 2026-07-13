@@ -170,11 +170,13 @@ export function enhanceFloorPlanLineContrast(
   // Desktop a bit heavier; mobile slightly lighter for dense plans.
   const lineWidth = boost === "mobile" ? "0.95px" : "1.35px";
   const wallWidth = boost === "mobile" ? "1.1px" : "1.55px";
-  const textWidth = boost === "mobile" ? "0.4px" : "0.5px";
-  // Room labels in CAFM exports are often ~16px — bump so numbers stay readable.
-  const labelScale = boost === "mobile" ? 1.45 : 1.35;
+  const textWidth = boost === "mobile" ? "0.55px" : "0.65px";
+  // CAFM labels use nested matrices (layer ~0.005 × group ~300). Scaling the
+  // group matrix grows text in place; font-size tweaks alone look tiny.
+  const labelScale = boost === "mobile" ? 4.25 : 3.75;
 
-  scaleSvgTextFontSizes(svgElement, labelScale);
+  scaleCafmLabelTransforms(svgElement, labelScale);
+  scaleSvgTextFontSizes(svgElement, 1.15);
 
   style.textContent = `
     #planDetail line,
@@ -219,6 +221,43 @@ export function enhanceFloorPlanLineContrast(
   `;
 
   svgElement.insertBefore(style, svgElement.firstChild);
+}
+
+/**
+ * CAFM Affinity exports wrap each label as:
+ *   #CAFM_ID[matrix(0.005…)] > g[matrix(300…, tx, ty)] > text
+ * Scaling a/b/c/d on the inner group grows the glyph around its anchor.
+ */
+function scaleCafmLabelTransforms(
+  svgElement: SVGSVGElement,
+  factor: number
+): void {
+  if (!(factor > 0) || factor === 1) return;
+
+  svgElement.querySelectorAll("g[transform]").forEach((node) => {
+    const g = node as SVGGElement;
+    const transform = g.getAttribute("transform");
+    if (!transform || !g.querySelector("text")) return;
+
+    const match = transform.match(/matrix\s*\(\s*([^)]+)\)/i);
+    if (!match) return;
+
+    const parts = match[1]
+      .trim()
+      .split(/[\s,]+/)
+      .map((value) => Number(value));
+    if (parts.length < 6 || parts.some((value) => !Number.isFinite(value))) {
+      return;
+    }
+
+    const [a, b, c, d, e, f] = parts;
+    // Label wrappers are ~300; layer roots are ~0.005 — only scale wrappers.
+    const linearScale = Math.hypot(a, b);
+    if (linearScale < 10 || linearScale > 5000) return;
+
+    const next = `matrix(${a * factor},${b * factor},${c * factor},${d * factor},${e},${f})`;
+    g.setAttribute("transform", transform.replace(match[0], next));
+  });
 }
 
 /** Multiply existing SVG label font sizes (attribute + inline style). */
