@@ -23,6 +23,7 @@ import { annotationMatchesQuestionFilter, type Annotation } from "@/lib/survey-d
 import { clientToSvgPoint, findRoomMatchAtSvgPoint, formatRoomLocationDisplay, logCafmFloorPlanAudit, logRoomsWithinFloorPlanShape, type FloorPlanSelectionShape, type RoomInfo } from "@/lib/spaces-data";
 import {
   applySvgViewBox,
+  cropMountedSvgToContent,
   enhanceFloorPlanLineContrast,
   resolveSvgViewBox,
   LARGE_SVG_CHAR_THRESHOLD,
@@ -119,12 +120,14 @@ export function FloorPlanViewer({
   /** Bumps when a new SVG should be mounted into the host (avoids keeping a second full SVG string in React state). */
   const [svgMountKey, setSvgMountKey] = useState(0);
   const pendingSvgRef = useRef<SVGSVGElement | null>(null);
+  const svgSourceLengthRef = useRef(0);
   const [svgReady, setSvgReady] = useState(false);
 
   // Parse SVG and prepare for mount — do not serializeToString (doubles memory on large CAFM plans).
   useEffect(() => {
     if (!svgContent) {
       pendingSvgRef.current = null;
+      svgSourceLengthRef.current = 0;
       setViewBox(null);
       setHighlightPolygon(null);
       setSvgReady(false);
@@ -135,6 +138,7 @@ export function FloorPlanViewer({
 
     let cancelled = false;
     const sourceLength = svgContent.length;
+    svgSourceLengthRef.current = sourceLength;
 
     const processSvg = () => {
       if (cancelled) return;
@@ -199,6 +203,20 @@ export function FloorPlanViewer({
     pendingSvgRef.current = null;
 
     setHighlightPolygon(null);
+
+    // Crop empty CAFM canvas margins so the building fills the viewer.
+    // Skip only for very large files where getBBox can be costly on phones.
+    const canCrop =
+      svgSourceLengthRef.current > 0 &&
+      svgSourceLengthRef.current < LARGE_SVG_CHAR_THRESHOLD * 2;
+    if (canCrop) {
+      const frameId = requestAnimationFrame(() => {
+        if (svgRef.current !== mounted) return;
+        const cropped = cropMountedSvgToContent(mounted);
+        if (cropped) setViewBox(cropped);
+      });
+      return () => cancelAnimationFrame(frameId);
+    }
   }, [svgMountKey, svgReady]);
 
   useEffect(() => {
@@ -247,10 +265,10 @@ export function FloorPlanViewer({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Calculate scale to fit
+  // Calculate scale to fit — small padding so the building fills the panel.
   const calculateFitScale = useCallback(() => {
     if (!viewBox || containerSize.width === 0) return 1;
-    const padding = 8;
+    const padding = 4;
     const scaleX = (containerSize.width - padding) / viewBox.width;
     const scaleY = (containerSize.height - padding) / viewBox.height;
     return Math.min(scaleX, scaleY);

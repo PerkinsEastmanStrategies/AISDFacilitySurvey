@@ -112,6 +112,40 @@ export function applySvgViewBox(
   );
 }
 
+/**
+ * Crop an already-mounted SVG to its drawn content. Safer than cloning the
+ * whole tree (used by getTightSvgViewBox) and fixes CAFM exports whose
+ * declared viewBox leaves large empty margins.
+ */
+export function cropMountedSvgToContent(
+  svgElement: SVGSVGElement,
+  paddingRatio = 0.04
+): SvgViewBox | null {
+  try {
+    const bbox = svgElement.getBBox();
+    if (
+      !Number.isFinite(bbox.width) ||
+      !Number.isFinite(bbox.height) ||
+      bbox.width <= 0 ||
+      bbox.height <= 0
+    ) {
+      return null;
+    }
+
+    const pad = Math.max(bbox.width, bbox.height) * paddingRatio;
+    const next: SvgViewBox = {
+      x: bbox.x - pad,
+      y: bbox.y - pad,
+      width: bbox.width + pad * 2,
+      height: bbox.height + pad * 2,
+    };
+    applySvgViewBox(svgElement, next);
+    return next;
+  } catch {
+    return null;
+  }
+}
+
 const FLOOR_PLAN_CONTRAST_STYLE_ID = "aisd-floor-plan-contrast";
 
 export type FloorPlanContrastBoost = "default" | "mobile";
@@ -119,7 +153,7 @@ export type FloorPlanContrastBoost = "default" | "mobile";
 /**
  * Boost line contrast for display. Injected at render time so source SVG files
  * in Supabase do not need to be edited individually.
- * Mobile boost uses non-scaling strokes so walls stay readable on small screens.
+ * Uses non-scaling strokes so walls stay readable when the plan is zoomed to fit.
  */
 export function enhanceFloorPlanLineContrast(
   svgElement: SVGSVGElement,
@@ -133,77 +167,52 @@ export function enhanceFloorPlanLineContrast(
   const style = doc.createElementNS("http://www.w3.org/2000/svg", "style");
   style.id = FLOOR_PLAN_CONTRAST_STYLE_ID;
 
-  if (boost === "mobile") {
-    style.textContent = `
-      #planDetail line,
-      #planWalls line,
-      .proom,
-      line,
-      polyline,
-      rect[stroke],
-      rect[style*="stroke:"],
-      circle[stroke],
-      circle[style*="stroke:"],
-      ellipse[stroke],
-      ellipse[style*="stroke:"],
-      polygon[stroke],
-      polygon[style*="stroke:"],
-      path[stroke],
-      path[style*="stroke:"] {
-        stroke: #000000 !important;
-        stroke-opacity: 1 !important;
-        vector-effect: non-scaling-stroke !important;
-        stroke-width: 0.81px !important;
-      }
-      #CAFM_SPACE path,
-      #CAFM_SPACE rect,
-      #CAFM_BLDG_OTLN path,
-      #CAFM_BLDG_OTLN rect,
-      #A-WALLS path,
-      #A-WALLS line {
-        stroke: #000000 !important;
-        stroke-opacity: 1 !important;
-        vector-effect: non-scaling-stroke !important;
-        stroke-width: 0.91px !important;
-      }
-      text,
-      text tspan {
-        stroke: #1a1a1a !important;
-        stroke-opacity: 0.95 !important;
-        fill: #1a1a1a !important;
-        vector-effect: non-scaling-stroke !important;
-        stroke-width: 0.33px !important;
-      }
-    `;
-  } else {
-    style.textContent = `
-      #planDetail line,
-      #planWalls line,
-      .proom,
-      line,
-      polyline,
-      rect[stroke],
-      rect[style*="stroke:"],
-      circle[stroke],
-      circle[style*="stroke:"],
-      ellipse[stroke],
-      ellipse[style*="stroke:"],
-      polygon[stroke],
-      polygon[style*="stroke:"],
-      path[stroke],
-      path[style*="stroke:"] {
-        stroke: #111111 !important;
-        stroke-opacity: 0.92 !important;
-      }
-      #planDetail line {
-        stroke-opacity: 0.75 !important;
-      }
-      #planWalls line,
-      .proom {
-        stroke-opacity: 0.95 !important;
-      }
-    `;
-  }
+  // Desktop a bit heavier; mobile slightly lighter for dense plans.
+  const lineWidth = boost === "mobile" ? "0.95px" : "1.35px";
+  const wallWidth = boost === "mobile" ? "1.1px" : "1.55px";
+  const textWidth = boost === "mobile" ? "0.35px" : "0.45px";
+
+  style.textContent = `
+    #planDetail line,
+    #planWalls line,
+    .proom,
+    line,
+    polyline,
+    rect[stroke],
+    rect[style*="stroke:"],
+    circle[stroke],
+    circle[style*="stroke:"],
+    ellipse[stroke],
+    ellipse[style*="stroke:"],
+    polygon[stroke],
+    polygon[style*="stroke:"],
+    path[stroke],
+    path[style*="stroke:"] {
+      stroke: #000000 !important;
+      stroke-opacity: 1 !important;
+      vector-effect: non-scaling-stroke !important;
+      stroke-width: ${lineWidth} !important;
+    }
+    #CAFM_SPACE path,
+    #CAFM_SPACE rect,
+    #CAFM_BLDG_OTLN path,
+    #CAFM_BLDG_OTLN rect,
+    #A-WALLS path,
+    #A-WALLS line {
+      stroke: #000000 !important;
+      stroke-opacity: 1 !important;
+      vector-effect: non-scaling-stroke !important;
+      stroke-width: ${wallWidth} !important;
+    }
+    text,
+    text tspan {
+      stroke: #111111 !important;
+      stroke-opacity: 0.95 !important;
+      fill: #111111 !important;
+      vector-effect: non-scaling-stroke !important;
+      stroke-width: ${textWidth} !important;
+    }
+  `;
 
   svgElement.insertBefore(style, svgElement.firstChild);
 }
