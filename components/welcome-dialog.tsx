@@ -61,7 +61,7 @@ export function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
             Welcome
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Facility Planning &amp; Capital Assessment
+            Facility Suitability and Condition Survey
           </p>
         </div>
 
