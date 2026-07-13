@@ -7,6 +7,9 @@ export const DEFAULT_FLOOR_PLAN_MANIFEST_URL =
 /** Offline fallback when the live sheet cannot be fetched. */
 export const FLOOR_PLAN_MANIFEST_PATH = "/aisd-floor-plan-manifest.csv";
 
+/** Same-origin proxy that prefers the filtered Google Sheet (server-side fetch). */
+export const FLOOR_PLAN_MANIFEST_API_PATH = "/api/floor-plan-manifest";
+
 export const FLOOR_LEVELS = [
   { id: "basement", column: "Basement", shortLabel: "B", fullLabel: "Basement" },
   { id: "floor-1", column: "Floor 1", shortLabel: "L1", fullLabel: "Floor 1" },
@@ -159,47 +162,27 @@ export async function loadFloorPlanManifest(
 
   manifestLoadPromise = (async () => {
     try {
-      // Local CSV is same-origin and fast. The published Google Sheet is often
-      // slow or blocked on school/corporate networks — race it briefly, then
-      // fall back so the school dropdown never hangs.
-      let liveRows: FloorPlanManifestRow[] = [];
-      const livePromise = fetchManifestCsv(getManifestUrl(), 4000)
-        .then(rowsFromCsv)
-        .then((rows) => {
-          liveRows = rows;
-          if (rows.length > 0) {
-            manifestCache = rows;
-            manifestLoadedSuccessfully = true;
-          }
-          return rows;
-        });
+      // Priority 1: filtered Google Sheet via same-origin API (server fetches the
+      // sheet so browser/network filters blocking docs.google.com do not matter).
+      const apiRows = await fetchManifestCsv(
+        FLOOR_PLAN_MANIFEST_API_PATH,
+        15000
+      ).then(rowsFromCsv);
+      if (apiRows.length > 0) {
+        manifestCache = apiRows;
+        manifestLoadedSuccessfully = true;
+        return manifestCache;
+      }
 
+      // Priority 2: bundled public CSV (last resort).
       const localRows = await fetchManifestCsv(
         FLOOR_PLAN_MANIFEST_PATH,
         5000
       ).then(rowsFromCsv);
-
-      // Brief window for the live sheet if it's already nearly done.
-      await Promise.race([
-        livePromise,
-        new Promise<void>((resolve) => setTimeout(resolve, 400)),
-      ]);
-
-      if (liveRows.length > 0) {
-        return liveRows;
-      }
-
       if (localRows.length > 0) {
         manifestCache = localRows;
         manifestLoadedSuccessfully = true;
-        // Keep waiting in the background so later floor lookups can use fresh data.
-        void livePromise;
-        return localRows;
-      }
-
-      liveRows = await livePromise;
-      if (liveRows.length > 0) {
-        return liveRows;
+        return manifestCache;
       }
 
       manifestCache = [];
