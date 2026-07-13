@@ -63,7 +63,8 @@ export function getSupabaseFloorPlanUrl(buildingName: string): string | null {
 
 const svgCache = new Map<string, string>();
 const svgInflight = new Map<string, Promise<string | null>>();
-const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v1";
+/** Bump when floor-plan fetch rules change so stale Cache API entries are ignored. */
+const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v2";
 
 async function openFloorPlanCache(): Promise<Cache | null> {
   if (typeof window === "undefined" || !("caches" in window)) return null;
@@ -177,29 +178,32 @@ export function prefetchFloorPlanSvgs(filenames: string[]): void {
 export async function fetchFloorPlanSvgForLevel(
   buildingName: string,
   floor: FloorPlanLevel,
-  fallbackSvg?: string | null
+  fallbackSvg?: string | null,
+  options?: { preferMobile?: boolean }
 ): Promise<string | null> {
   if (!getSchoolByName(buildingName)) return fallbackSvg ?? null;
-  return fetchFloorPlanSvgByFilename(floor.filename, fallbackSvg);
+  return fetchFloorPlanSvgByFilename(floor.filename, fallbackSvg, options);
 }
 
 /** Load the default/first available floor for a school. */
 export async function fetchFloorPlanSvg(
   buildingName: string,
-  fallbackSvg?: string | null
+  fallbackSvg?: string | null,
+  options?: { preferMobile?: boolean }
 ): Promise<string | null> {
   const floors = await getAvailableFloors(buildingName);
   if (floors.length === 0) return fallbackSvg ?? null;
-  return fetchFloorPlanSvgForLevel(buildingName, floors[0], fallbackSvg);
+  return fetchFloorPlanSvgForLevel(buildingName, floors[0], fallbackSvg, options);
 }
 
 export async function fetchFloorPlanSvgForFloorId(
   buildingName: string,
   floorId: FloorLevelId,
-  fallbackSvg?: string | null
+  fallbackSvg?: string | null,
+  options?: { preferMobile?: boolean }
 ): Promise<string | null> {
   const floors = await getAvailableFloors(buildingName);
   const floor = floors.find((entry) => entry.id === floorId) ?? floors[0];
   if (!floor) return fallbackSvg ?? null;
-  return fetchFloorPlanSvgForLevel(buildingName, floor, fallbackSvg);
+  return fetchFloorPlanSvgForLevel(buildingName, floor, fallbackSvg, options);
 }

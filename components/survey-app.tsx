@@ -43,7 +43,7 @@ import {
   REPORT_TOUR_STEPS,
   getQuestionTourSteps,
 } from "@/lib/guided-tour-steps";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsMobile, usePrefersMobileFloorPlan } from "@/hooks/use-mobile";
 import {
   WelcomeDialog,
   hasSeenWelcome,
@@ -111,6 +111,8 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
   // don't load while they are still answering the first question.
   const [mobileViewerOpen, setMobileViewerOpen] = useState(false);
   const isMobile = useIsMobile();
+  const { ready: floorPlanDeviceReady, preferMobile } =
+    usePrefersMobileFloorPlan();
   const [surveyData, setSurveyData] = useState<SurveyData>({
     school: "",
     role: "",
@@ -272,11 +274,13 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
   }, [isSpacesQuestion]);
 
   // Load floor plan manifest + default floor when a school is selected.
-  // On phones, prefer `*.mobile.svg` when present; desktop keeps the full plan.
+  // On phones/tablets, prefer `*.mobile.svg` when present; desktop keeps the full plan.
   useEffect(() => {
     let cancelled = false;
 
     async function loadSchoolPlans() {
+      if (!floorPlanDeviceReady) return;
+
       if (!surveyData.school) {
         setAvailableFloors([]);
         setActiveFloorId("floor-1");
@@ -297,13 +301,13 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
 
       const svg = initialFloor
         ? await fetchFloorPlanSvgByFilename(initialFloor.filename, defaultSvg, {
-            preferMobile: isMobile,
+            preferMobile,
           })
         : defaultSvg;
       if (cancelled) return;
 
-      // Prefetching every floor doubles memory; skip on phones.
-      if (!isMobile) {
+      // Prefetching every floor doubles memory; skip on phones/tablets.
+      if (!preferMobile) {
         prefetchFloorPlanSvgs(
           floors.slice(1).map((floor) => floor.filename).filter(Boolean)
         );
@@ -326,7 +330,7 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
       cancelled = true;
       setFloorPlanLoading(false);
     };
-  }, [surveyData.school, defaultSvg, isMobile]);
+  }, [surveyData.school, defaultSvg, floorPlanDeviceReady, preferMobile]);
 
   const handleFloorChange = useCallback(
     async (floorId: string) => {
@@ -336,12 +340,12 @@ export default function SurveyApp({ defaultSvg }: { defaultSvg: string }) {
       setActiveFloorId(floorId);
       setFloorPlanLoading(true);
       const svg = await fetchFloorPlanSvgByFilename(floor.filename, defaultSvg, {
-        preferMobile: isMobile,
+        preferMobile,
       });
       setSurveyData((prev) => ({ ...prev, svgContent: svg }));
       setFloorPlanLoading(false);
     },
-    [availableFloors, defaultSvg, isMobile]
+    [availableFloors, defaultSvg, preferMobile]
   );
 
   const selectedSchool = getSchoolByName(surveyData.school);
