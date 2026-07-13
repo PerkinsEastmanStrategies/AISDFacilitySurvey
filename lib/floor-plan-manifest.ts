@@ -46,13 +46,6 @@ let manifestCache: FloorPlanManifestRow[] | null = null;
 let manifestLoadPromise: Promise<FloorPlanManifestRow[]> | null = null;
 let manifestLoadedSuccessfully = false;
 
-function getManifestUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_FLOOR_PLAN_MANIFEST_URL ??
-    DEFAULT_FLOOR_PLAN_MANIFEST_URL
-  );
-}
-
 function parseCsvLine(line: string): string[] {
   const values: string[] = [];
   let current = "";
