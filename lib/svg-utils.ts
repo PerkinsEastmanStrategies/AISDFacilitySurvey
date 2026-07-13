@@ -170,7 +170,11 @@ export function enhanceFloorPlanLineContrast(
   // Desktop a bit heavier; mobile slightly lighter for dense plans.
   const lineWidth = boost === "mobile" ? "0.95px" : "1.35px";
   const wallWidth = boost === "mobile" ? "1.1px" : "1.55px";
-  const textWidth = boost === "mobile" ? "0.35px" : "0.45px";
+  const textWidth = boost === "mobile" ? "0.4px" : "0.5px";
+  // Room labels in CAFM exports are often ~16px — bump so numbers stay readable.
+  const labelScale = boost === "mobile" ? 1.45 : 1.35;
+
+  scaleSvgTextFontSizes(svgElement, labelScale);
 
   style.textContent = `
     #planDetail line,
@@ -215,4 +219,40 @@ export function enhanceFloorPlanLineContrast(
   `;
 
   svgElement.insertBefore(style, svgElement.firstChild);
+}
+
+/** Multiply existing SVG label font sizes (attribute + inline style). */
+function scaleSvgTextFontSizes(svgElement: SVGSVGElement, factor: number): void {
+  if (!(factor > 0) || factor === 1) return;
+
+  svgElement.querySelectorAll("text, tspan").forEach((node) => {
+    const el = node as SVGElement;
+
+    const attr = el.getAttribute("font-size");
+    if (attr) {
+      const match = attr.trim().match(/^([\d.]+)(.*)$/);
+      if (match) {
+        const next = parseFloat(match[1]) * factor;
+        if (Number.isFinite(next)) {
+          el.setAttribute("font-size", `${next}${match[2]}`);
+        }
+      }
+    }
+
+    const styleAttr = el.getAttribute("style");
+    if (styleAttr && /font-size\s*:/i.test(styleAttr)) {
+      el.setAttribute(
+        "style",
+        styleAttr.replace(
+          /font-size\s*:\s*([\d.]+)([a-z%]*)/i,
+          (_full, value: string, unit: string) => {
+            const next = parseFloat(value) * factor;
+            return Number.isFinite(next)
+              ? `font-size:${next}${unit}`
+              : `font-size:${value}${unit}`;
+          }
+        )
+      );
+    }
+  });
 }
