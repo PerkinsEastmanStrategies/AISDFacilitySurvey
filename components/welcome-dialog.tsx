@@ -31,7 +31,7 @@ export function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[110] flex items-center justify-center p-4 sm:p-6"
+      className="fixed inset-0 z-[110] flex items-end justify-center p-3 sm:items-center sm:p-6"
       role="dialog"
       aria-modal="true"
       aria-labelledby="welcome-title"
@@ -42,15 +42,15 @@ export function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
         aria-hidden="true"
       />
 
-      <div className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <div className="border-b border-border/60 bg-muted/30 px-6 py-8 text-center">
-          <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-border/60">
+      <div className="relative flex max-h-[min(92dvh,100%)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        <div className="shrink-0 border-b border-border/60 bg-muted/30 px-5 py-5 text-center sm:px-6 sm:py-8">
+          <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-border/60 sm:mb-4 sm:h-20 sm:w-20">
             <Image
               src="/images/aisd-logo.jpg"
               alt="Austin Independent School District"
               width={72}
               height={72}
-              className="h-16 w-auto object-contain"
+              className="h-12 w-auto object-contain sm:h-16"
               priority
             />
           </div>
@@ -65,7 +65,7 @@ export function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
           </p>
         </div>
 
-        <div className="space-y-4 px-6 py-6">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6 sm:py-6">
           <p className="text-sm leading-relaxed text-foreground">
             Thank you for taking the time to complete this survey. Your
             perspective is an essential part of a{" "}
@@ -115,7 +115,7 @@ export function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
           </div>
         </div>
 
-        <div className="border-t border-border/60 bg-muted/20 px-6 py-4">
+        <div className="shrink-0 border-t border-border/60 bg-muted/20 px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
           <Button size="lg" className="w-full" onClick={onClose}>
             Get Started
           </Button>
