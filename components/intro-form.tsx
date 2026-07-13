@@ -40,9 +40,13 @@ export function IntroForm({ data, onChange }: IntroFormProps) {
 
   useEffect(() => {
     let cancelled = false;
-    loadManifestSchoolOptions().then((schools) => {
-      if (!cancelled) setManifestSchools(schools);
-    });
+    loadManifestSchoolOptions()
+      .then((schools) => {
+        if (!cancelled) setManifestSchools(schools);
+      })
+      .catch(() => {
+        if (!cancelled) setManifestSchools([]);
+      });
     return () => {
       cancelled = true;
     };

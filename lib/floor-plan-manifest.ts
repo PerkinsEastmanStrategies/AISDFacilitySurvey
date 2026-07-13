@@ -126,14 +126,29 @@ function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
   return rows;
 }
 
-async function fetchManifestCsv(url: string): Promise<string | null> {
+async function fetchManifestCsv(
+  url: string,
+  timeoutMs = 8000
+): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
     if (!response.ok) return null;
     return await response.text();
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+function rowsFromCsv(csvText: string | null): FloorPlanManifestRow[] {
+  if (!csvText) return [];
+  return parseManifestCsv(csvText);
 }
 
 export async function loadFloorPlanManifest(
@@ -144,38 +159,47 @@ export async function loadFloorPlanManifest(
 
   manifestLoadPromise = (async () => {
     try {
-      // Local CSV first in development so mobile `*.mobile.svg` test files
-      // (e.g. Zilker L1/LM) are used without waiting on the live sheet.
-      if (process.env.NODE_ENV === "development") {
-        const localCsv = await fetchManifestCsv(FLOOR_PLAN_MANIFEST_PATH);
-        if (localCsv) {
-          const localRows = parseManifestCsv(localCsv);
-          if (localRows.length > 0) {
-            manifestCache = localRows;
+      // Local CSV is same-origin and fast. The published Google Sheet is often
+      // slow or blocked on school/corporate networks — race it briefly, then
+      // fall back so the school dropdown never hangs.
+      let liveRows: FloorPlanManifestRow[] = [];
+      const livePromise = fetchManifestCsv(getManifestUrl(), 4000)
+        .then(rowsFromCsv)
+        .then((rows) => {
+          liveRows = rows;
+          if (rows.length > 0) {
+            manifestCache = rows;
             manifestLoadedSuccessfully = true;
-            return manifestCache;
           }
-        }
+          return rows;
+        });
+
+      const localRows = await fetchManifestCsv(
+        FLOOR_PLAN_MANIFEST_PATH,
+        5000
+      ).then(rowsFromCsv);
+
+      // Brief window for the live sheet if it's already nearly done.
+      await Promise.race([
+        livePromise,
+        new Promise<void>((resolve) => setTimeout(resolve, 400)),
+      ]);
+
+      if (liveRows.length > 0) {
+        return liveRows;
       }
 
-      const liveCsv = await fetchManifestCsv(getManifestUrl());
-      if (liveCsv) {
-        const liveRows = parseManifestCsv(liveCsv);
-        if (liveRows.length > 0) {
-          manifestCache = liveRows;
-          manifestLoadedSuccessfully = true;
-          return manifestCache;
-        }
+      if (localRows.length > 0) {
+        manifestCache = localRows;
+        manifestLoadedSuccessfully = true;
+        // Keep waiting in the background so later floor lookups can use fresh data.
+        void livePromise;
+        return localRows;
       }
 
-      const localCsv = await fetchManifestCsv(FLOOR_PLAN_MANIFEST_PATH);
-      if (localCsv) {
-        const localRows = parseManifestCsv(localCsv);
-        if (localRows.length > 0) {
-          manifestCache = localRows;
-          manifestLoadedSuccessfully = true;
-          return manifestCache;
-        }
+      liveRows = await livePromise;
+      if (liveRows.length > 0) {
+        return liveRows;
       }
 
       manifestCache = [];
@@ -226,12 +250,12 @@ export interface ManifestSchoolOption {
   hasFloorPlans: boolean;
 }
 
-/** Schools listed in the live manifest CSV, in sheet order. Null if manifest unavailable. */
+/** Schools listed in the floor plan manifest, in sheet order. Empty if unavailable. */
 export async function loadManifestSchoolOptions(): Promise<
-  ManifestSchoolOption[] | null
+  ManifestSchoolOption[]
 > {
   const manifest = await loadFloorPlanManifest();
-  if (!manifestLoadedSuccessfully || manifest.length === 0) return null;
+  if (!manifestLoadedSuccessfully || manifest.length === 0) return [];
 
   return manifest.map((row) => ({
     name: row.schoolName,
