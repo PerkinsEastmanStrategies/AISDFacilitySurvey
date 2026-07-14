@@ -151,52 +151,26 @@ async function fetchFloorPlanSvgFromSources(
 export async function fetchFloorPlanSvgByFilename(
   filename: string,
   fallbackSvg?: string | null,
-  options?: { preferMobile?: boolean }
+  _options?: { preferMobile?: boolean }
 ): Promise<string | null> {
   if (!filename) return fallbackSvg ?? null;
 
-  const candidates = options?.preferMobile
-    ? [toMobileFloorPlanFilename(filename), filename]
-    : [filename];
-  const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
-  const preferMobile = Boolean(options?.preferMobile);
+  // Always load the full (non-mobile) SVG — mobile variants are often labels-only.
+  const candidate = filename;
+  const cached = svgCache.get(candidate);
+  if (cached) return cached;
 
-  for (let i = 0; i < uniqueCandidates.length; i += 1) {
-    const candidate = uniqueCandidates[i];
-    const cached = svgCache.get(candidate);
-    let svg = cached ?? null;
+  let inflight = svgInflight.get(candidate);
+  if (!inflight) {
+    inflight = fetchFloorPlanSvgFromSources(candidate).finally(() => {
+      svgInflight.delete(candidate);
+    });
+    svgInflight.set(candidate, inflight);
+  }
 
-    if (!svg) {
-      let inflight = svgInflight.get(candidate);
-      if (!inflight) {
-        inflight = fetchFloorPlanSvgFromSources(candidate).finally(() => {
-          svgInflight.delete(candidate);
-        });
-        svgInflight.set(candidate, inflight);
-      }
-      svg = await inflight;
-      if (svg) {
-        svgCache.set(candidate, svg);
-      }
-    }
-
-    if (!svg) continue;
-
-    // Mobile exports are sometimes labels-only (CAFM_ID, no walls). Skip them
-    // when a fuller candidate remains (usually the desktop SVG).
-    const isMobileCandidate = /\.mobile\.svg$/i.test(candidate);
-    const hasLaterFullCandidate =
-      preferMobile &&
-      isMobileCandidate &&
-      uniqueCandidates.slice(i + 1).some((name) => !/\.mobile\.svg$/i.test(name));
-
-    if (
-      hasLaterFullCandidate &&
-      !svgHasFloorPlanGeometry(svg)
-    ) {
-      continue;
-    }
-
+  const svg = await inflight;
+  if (svg) {
+    svgCache.set(candidate, svg);
     return svg;
   }
 

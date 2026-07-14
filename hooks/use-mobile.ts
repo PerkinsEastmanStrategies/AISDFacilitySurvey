@@ -22,24 +22,12 @@ export function useIsMobile(): boolean {
 }
 
 /**
- * Prefer lightweight `*.mobile.svg` floor plans on narrow viewports only.
- * Do not key off `pointer: coarse` — touchscreen laptops would otherwise load
- * incomplete mobile exports (labels without walls) on large screens.
+ * Floor-plan loading always uses the full (non-mobile) SVG.
+ * Kept for call-site compatibility; `preferMobile` is always false.
  */
 export function usePrefersMobileFloorPlan(): {
   ready: boolean;
   preferMobile: boolean;
 } {
-  const [state, setState] = useState({ ready: false, preferMobile: false });
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia("(max-width: 1023px)");
-    const update = () =>
-      setState({ ready: true, preferMobile: mediaQuery.matches });
-    update();
-    mediaQuery.addEventListener("change", update);
-    return () => mediaQuery.removeEventListener("change", update);
-  }, []);
-
-  return state;
+  return { ready: true, preferMobile: false };
 }
