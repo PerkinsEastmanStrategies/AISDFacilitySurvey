@@ -48,14 +48,8 @@ export const QUESTION_TOUR_STEPS: TourStep[] = [
   },
   {
     target: "ranking",
-    title: "Prioritize improvements",
-    body: "On the Improvement Prioritization step, select up to five categories that matter most for your campus.",
-    placement: "right",
-  },
-  {
-    target: "program-spaces",
-    title: "Place program spaces",
-    body: "On the Program Spaces step, pick a space type (Maker Space, Group Rooms, etc.), then click rooms on the floor plan to assign them. You can assign multiple rooms per space.",
+    title: "Rank modernization priorities",
+    body: "On Campus Improvement Priorities, select up to five categories in order of priority (first = highest). Add optional notes in the text box.",
     placement: "right",
   },
   {

@@ -232,21 +232,6 @@ export function IntroForm({
                 className="text-xs md:text-xs"
               />
             </div>
-
-            <div className="space-y-1">
-              <Label htmlFor="specialEducation" className="text-xs font-semibold leading-snug text-foreground">
-                Does your school have any community partners that occupy space on
-                campus? If so, please describe.
-              </Label>
-              <Textarea
-                id="specialEducation"
-                value={data.specialEducation}
-                onChange={(e) => handleChange("specialEducation", e.target.value)}
-                placeholder="Describe any community partners on campus..."
-                rows={2}
-                className="text-xs md:text-xs"
-              />
-            </div>
           </>
         )}
       </CardContent>

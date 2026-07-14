@@ -575,24 +575,37 @@ export function ReportView({
                                 </div>
                                 <p className="mb-3 text-sm text-foreground">{question.text}</p>
                                 <p className="mb-2 text-sm font-medium text-muted-foreground">
-                                  Selected priorities (up to 5):
+                                  Ranked priorities (1 = highest):
                                 </p>
                                 {selected.length === 0 ? (
                                   <p className="text-sm italic text-muted-foreground">
                                     No priorities selected
                                   </p>
                                 ) : (
-                                  <ul className="space-y-1.5">
-                                    {selected.map((category) => (
+                                  <ol className="space-y-1.5">
+                                    {selected.map((category, index) => (
                                       <li
                                         key={category}
                                         className="flex items-center gap-3 rounded-md bg-muted/50 px-3 py-2"
                                       >
-                                        <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                          {index + 1}
+                                        </span>
                                         <span className="text-sm text-foreground">{category}</span>
                                       </li>
                                     ))}
-                                  </ul>
+                                  </ol>
+                                )}
+                                {response?.explanation && (
+                                  <>
+                                    <Separator className="my-3" />
+                                    <p className="mb-1 text-sm font-medium text-muted-foreground">
+                                      Additional context
+                                    </p>
+                                    <p className="text-sm text-foreground whitespace-pre-wrap">
+                                      {response.explanation}
+                                    </p>
+                                  </>
                                 )}
                               </div>
                             );
@@ -925,14 +938,16 @@ export function ReportView({
                       {data.uniqueFeatures || "Not specified"}
                     </p>
                   </div>
-                  <div>
-                    <h4 className="font-medium text-foreground mb-2">
-                      Community Partners on Campus
-                    </h4>
-                    <p className="text-sm text-muted-foreground">
-                      {data.specialEducation || "Not specified"}
-                    </p>
-                  </div>
+                  {data.specialEducation?.trim() ? (
+                    <div>
+                      <h4 className="font-medium text-foreground mb-2">
+                        Community Partners on Campus
+                      </h4>
+                      <p className="text-sm text-muted-foreground">
+                        {data.specialEducation}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               </CardContent>
             </Card>

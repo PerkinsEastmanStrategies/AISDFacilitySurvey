@@ -105,14 +105,22 @@ export const SURVEY_QUESTIONS = [
   },
   {
     id: 14,
-    text: "The campus provides adequate storage to support the school's instructional and operational needs.",
-    category: "Storage",
+    text: "The physical design of the campus supports the day-to-day cleaning and maintenance needs of the building.",
+    category: "Custodial and Maintenance",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(15, 65%, 52%)",
   },
   {
     id: 15,
+    text: "The food service facilities, including the kitchen, dining areas, and serving spaces, effectively support daily operations and student needs.",
+    category: "Food Service",
+    section: "Educational Suitability",
+    type: "rating",
+    color: "hsl(25, 70%, 48%)",
+  },
+  {
+    id: 16,
     text: "Overall, the facility effectively supports the school's educational vision, instructional goals, and student success.",
     category: "Overall Educational Suitability",
     section: "Educational Suitability",
@@ -120,28 +128,20 @@ export const SURVEY_QUESTIONS = [
     color: "hsl(120, 50%, 45%)",
   },
   {
-    id: 16,
-    text: "What are your top 3 safety and security priorities for this campus?",
-    category: "Safety and Security Priorities",
-    section: "Educational Suitability",
-    type: "text",
-    color: "hsl(0, 70%, 45%)",
-  },
-  {
     id: 17,
-    text: "Which categories are your top priorities for improvement on this campus? Select up to 5.",
-    category: "Improvement Prioritization",
+    text: "Looking ahead over the next 5 years, please rank your top 5 large-scale facility modernization projects in order of priority.",
+    category: "Campus Improvement Priorities",
     section: "Educational Suitability",
     type: "ranking",
     color: "hsl(220, 15%, 40%)",
   },
   {
     id: 18,
-    text: "Identify the location of your key program spaces by assigning each one to a room on the floor plan.",
-    category: "Program Space Locations",
+    text: "What are your top 3 safety and security priorities for this campus?",
+    category: "Safety and Security Priorities",
     section: "Educational Suitability",
-    type: "spaces",
-    color: "hsl(265, 55%, 50%)",
+    type: "text",
+    color: "hsl(0, 70%, 45%)",
   },
   // Facility Condition Assessment (FCA) — positive Likert statements
   {
@@ -628,9 +628,8 @@ export function formatRatingDisplay(
 }
 
 /**
- * The educational-suitability categories that respondents choose from in the
- * Improvement Prioritization question (they pick up to MAX_PRIORITIES). Derived
- * from the rating questions, excluding the summary "Overall Educational Suitability".
+ * Categories respondents rank in Campus Improvement Priorities (Q17).
+ * Likert categories #1–15 only — excludes Overall Educational Suitability.
  */
 export const PRIORITIZATION_CATEGORIES: string[] = SURVEY_QUESTIONS.filter(
   (q) =>
@@ -639,7 +638,7 @@ export const PRIORITIZATION_CATEGORIES: string[] = SURVEY_QUESTIONS.filter(
     q.category !== "Overall Educational Suitability"
 ).map((q) => q.category);
 
-/** Maximum number of priorities a respondent may select in Improvement Prioritization. */
+/** Maximum number of priorities a respondent may select in Campus Improvement Priorities. */
 export const MAX_PRIORITIES = 5;
 
 export type SurveyQuestion = (typeof SURVEY_QUESTIONS)[number];
@@ -713,8 +712,8 @@ export interface QuestionResponse {
   rating: number;
   explanation: string;
   /**
-   * For the ranking-type question (Improvement Prioritization), the set of
-   * selected priority categories (unordered, up to MAX_PRIORITIES).
+   * For ranking-type questions (Campus Improvement Priorities), categories in
+   * priority order (index 0 = highest), up to MAX_PRIORITIES.
    */
   ranking?: string[];
 }

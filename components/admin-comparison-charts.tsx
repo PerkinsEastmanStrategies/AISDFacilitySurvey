@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   computeCategoryScoresFromResponses,
@@ -9,7 +9,7 @@ import {
 } from "@/lib/submission-analytics";
 import type { SurveyData } from "@/lib/survey-data";
 import { isRatingScored } from "@/lib/survey-data";
-import { TrendingDown, TrendingUp, Minus } from "lucide-react";
+import { ChevronDown, TrendingDown, TrendingUp, Minus } from "lucide-react";
 
 interface AdminComparisonChartsProps {
   analytics: DistrictAnalytics | null;
@@ -104,6 +104,8 @@ export function AdminComparisonCharts({
   selectedSchool,
   selectedSubmissionId,
 }: AdminComparisonChartsProps) {
+  const [expanded, setExpanded] = useState(false);
+
   const selectedScores = useMemo(() => {
     if (!reportData) return new Map<string, number>();
     return new Map(
@@ -217,18 +219,37 @@ export function AdminComparisonCharts({
   );
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-6">
-      <div>
-        <h2 className="text-lg font-semibold text-foreground">District Comparison</h2>
-        <p className="text-sm text-muted-foreground">
-          Based on {analytics.submissionCount} submission
-          {analytics.submissionCount === 1 ? "" : "s"} across{" "}
-          {analytics.schoolScores.length} school
-          {analytics.schoolScores.length === 1 ? "" : "s"}. Vertical ticks mark district
-          averages.
-        </p>
-      </div>
+    <div className="mx-auto max-w-7xl px-4 py-6">
+      <div className="rounded-xl border border-border/60 bg-card shadow-sm">
+        <button
+          type="button"
+          onClick={() => setExpanded((open) => !open)}
+          className="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40"
+          aria-expanded={expanded}
+        >
+          <div>
+            <h2 className="text-lg font-semibold text-foreground">
+              District Comparison
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Based on {analytics.submissionCount} submission
+              {analytics.submissionCount === 1 ? "" : "s"} across{" "}
+              {analytics.schoolScores.length} school
+              {analytics.schoolScores.length === 1 ? "" : "s"}
+              {!expanded && currentSubmissionScore > 0
+                ? ` · this submission ${currentSubmissionScore.toFixed(1)} vs district ${analytics.districtOverallAvg.toFixed(1)}`
+                : ". Vertical ticks mark district averages."}
+            </p>
+          </div>
+          <ChevronDown
+            className={`mt-1 h-5 w-5 shrink-0 text-muted-foreground transition-transform ${
+              expanded ? "rotate-180" : ""
+            }`}
+          />
+        </button>
 
+        {expanded && (
+          <div className="space-y-6 border-t border-border/60 px-4 py-5">
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
@@ -402,6 +423,9 @@ export function AdminComparisonCharts({
             )}
           </CardContent>
         </Card>
+      </div>
+          </div>
+        )}
       </div>
     </div>
   );

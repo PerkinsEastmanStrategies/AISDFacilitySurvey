@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   SURVEY_QUESTIONS,
   PRIORITIZATION_CATEGORIES,
+  MAX_PRIORITIES,
   DONT_KNOW_RATING,
   NA_RATING,
   formatRatingDisplay,
@@ -199,17 +200,35 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
         {question.type === "ranking" ? (
           <div className="space-y-1.5" data-tour="ranking">
             <Label className="text-[11px] font-medium text-foreground">
-              Select up to 5 priority categories
+              Rank your top {MAX_PRIORITIES} priorities
             </Label>
             <p className="text-[11px] text-muted-foreground">
-              Choose the areas you feel are the highest priorities for
-              improvement on this campus.
+              Select categories in order of priority (first selected = highest).
+              Categories come from Educational Suitability questions 1–15.
             </p>
             <CategoryRanking
               categories={PRIORITIZATION_CATEGORIES}
               value={safeResponse.ranking}
               onChange={(ranking) => onChange({ ...safeResponse, ranking })}
             />
+            <div className="space-y-1 pt-1">
+              <Label
+                htmlFor="ranking-context"
+                className="text-[11px] font-medium text-foreground"
+              >
+                Additional context (optional)
+              </Label>
+              <Textarea
+                id="ranking-context"
+                value={safeResponse.explanation}
+                onChange={(e) =>
+                  onChange({ ...safeResponse, explanation: e.target.value })
+                }
+                placeholder="Add any notes about these modernization priorities…"
+                rows={2}
+                className="resize-none text-[10px] md:text-[10px]"
+              />
+            </div>
           </div>
         ) : question.type === "text" ? (
           <div className="space-y-1">
