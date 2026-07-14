@@ -1,6 +1,7 @@
 import {
   getAvailableFloors,
   getDefaultFloorFilename,
+  pickDefaultFloor,
   type FloorLevelId,
   type FloorPlanLevel,
 } from "@/lib/floor-plan-manifest";
@@ -14,6 +15,7 @@ export {
   getAvailableFloors,
   getAvailableFloorsForSchool,
   loadFloorPlanManifest,
+  pickDefaultFloor,
 } from "@/lib/floor-plan-manifest";
 
 /**

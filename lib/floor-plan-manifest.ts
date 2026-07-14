@@ -292,6 +292,14 @@ export function getAvailableFloorsForSchool(
   ];
 }
 
+/** Prefer L1 when present; otherwise the first available floor. */
+export function pickDefaultFloor(
+  floors: FloorPlanLevel[]
+): FloorPlanLevel | undefined {
+  if (floors.length === 0) return undefined;
+  return floors.find((floor) => floor.id === "floor-1") ?? floors[0];
+}
+
 export async function getAvailableFloors(
   buildingName: string
 ): Promise<FloorPlanLevel[]> {

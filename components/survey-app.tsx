@@ -12,6 +12,7 @@ import { MapViewer } from "@/components/map-viewer";
 import { SpaceAssignmentForm } from "@/components/space-assignment-form";
 import { getSchoolByName } from "@/lib/schools-data";
 import { fetchFloorPlanSvgByFilename, getAvailableFloors, prefetchFloorPlanSvgs, type FloorPlanLevel } from "@/lib/floor-plans";
+import { pickDefaultFloor } from "@/lib/floor-plan-manifest";
 import { extractRoomsFromSvg, getSpaceColor, type RoomInfo } from "@/lib/spaces-data";
 import {
   getQuestionsForRole,
@@ -325,7 +326,7 @@ export default function SurveyApp({
       if (cancelled) return;
 
       setAvailableFloors(floors);
-      const initialFloor = floors[0];
+      const initialFloor = pickDefaultFloor(floors);
       setActiveFloorId(initialFloor?.id ?? "floor-1");
       setFloorPlanLoading(true);
 
@@ -339,7 +340,10 @@ export default function SurveyApp({
       // Prefetching every floor doubles memory; skip on phones/tablets.
       if (!preferMobile) {
         prefetchFloorPlanSvgs(
-          floors.slice(1).map((floor) => floor.filename).filter(Boolean)
+          floors
+            .filter((floor) => floor.id !== initialFloor?.id)
+            .map((floor) => floor.filename)
+            .filter(Boolean)
         );
       }
 
