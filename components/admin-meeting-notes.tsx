@@ -23,7 +23,7 @@ import {
 
 const NOTES_DATA_PREFIX = "aisd-admin-meeting-notes:v2:";
 const NOTES_DATA_PREFIX_V1 = "aisd-admin-meeting-notes:v1:";
-const NOTES_UI_KEY = "aisd-admin-meeting-notes-ui:v3";
+const NOTES_UI_KEY = "aisd-admin-meeting-notes-ui:v4";
 
 const DEFAULT_WIDTH = 420;
 const DEFAULT_HEIGHT = 440;
@@ -127,12 +127,12 @@ function saveNoteRecord(school: string, record: MeetingNoteRecord) {
 
 function defaultPosition(width: number, height: number): { x: number; y: number } {
   if (typeof window === "undefined") {
-    return { x: EDGE_PAD, y: 72 };
+    return { x: EDGE_PAD, y: 120 };
   }
   return {
     x: Math.max(EDGE_PAD, window.innerWidth - width - EDGE_PAD),
-    // Near the top, just under the sticky admin header
-    y: 72,
+    // Vertically centered on the right
+    y: Math.max(EDGE_PAD, Math.round((window.innerHeight - height) / 2)),
   };
 }
 
