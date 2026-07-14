@@ -28,6 +28,11 @@ interface QuestionFormProps {
 
 export function QuestionForm({ questionId, response, onChange, compact = false }: QuestionFormProps) {
   const question = SURVEY_QUESTIONS.find((q) => q.id === questionId);
+  const safeResponse = response ?? {
+    questionId,
+    rating: 0,
+    explanation: "",
+  };
 
   if (!question) return null;
 
@@ -70,9 +75,9 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
           <button
             key={num}
             type="button"
-            onClick={() => onChange({ ...response, rating: num })}
+            onClick={() => onChange({ ...safeResponse, rating: num })}
             className={`${buttonClass} ${
-              response.rating === num
+              safeResponse.rating === num
                 ? `${getRatingColor(num)} text-white scale-105 shadow-sm`
                 : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
             }`}
@@ -84,9 +89,9 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
           <button
             type="button"
             data-tour="fca-dont-know"
-            onClick={() => onChange({ ...response, rating: DONT_KNOW_RATING })}
+            onClick={() => onChange({ ...safeResponse, rating: DONT_KNOW_RATING })}
             className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-all ${
-              response.rating === DONT_KNOW_RATING
+              safeResponse.rating === DONT_KNOW_RATING
                 ? "bg-slate-600 text-white shadow-sm"
                 : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
             }`}
@@ -129,13 +134,13 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
         <div className="mt-1.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between" data-tour="rating">
           {renderRatingButtons("sm")}
           <span className="text-[9px] font-medium text-muted-foreground sm:text-right">
-            {getRatingLabel(response.rating)}
+            {getRatingLabel(safeResponse.rating)}
           </span>
         </div>
 
         <Textarea
-          value={response.explanation}
-          onChange={(e) => onChange({ ...response, explanation: e.target.value })}
+          value={safeResponse.explanation}
+          onChange={(e) => onChange({ ...safeResponse, explanation: e.target.value })}
           placeholder="Please explain your rating. If you want to highlight specific areas in the building, use the annotation tools below!"
           rows={1}
           className="mt-1.5 min-h-7 resize-none px-1.5 py-1 text-[10px] md:text-[10px]"
@@ -187,8 +192,8 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
             </p>
             <CategoryRanking
               categories={PRIORITIZATION_CATEGORIES}
-              value={response.ranking}
-              onChange={(ranking) => onChange({ ...response, ranking })}
+              value={safeResponse.ranking}
+              onChange={(ranking) => onChange({ ...safeResponse, ranking })}
             />
           </div>
         ) : question.type === "text" ? (
@@ -198,9 +203,9 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
             </Label>
             <Textarea
               id="open-response"
-              value={response.explanation}
+              value={safeResponse.explanation}
               onChange={(e) =>
-                onChange({ ...response, explanation: e.target.value })
+                onChange({ ...safeResponse, explanation: e.target.value })
               }
               placeholder="Type your response..."
               rows={3}
@@ -213,7 +218,7 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
               <div className="flex items-center justify-between">
                 <Label className="text-[11px] text-foreground">Rating</Label>
                 <span className="text-[11px] font-medium text-muted-foreground">
-                  {getRatingLabel(response.rating)}
+                  {getRatingLabel(safeResponse.rating)}
                 </span>
               </div>
 
@@ -229,9 +234,9 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
               </Label>
               <Textarea
                 id="explanation"
-                value={response.explanation}
+                value={safeResponse.explanation}
                 onChange={(e) =>
-                  onChange({ ...response, explanation: e.target.value })
+                  onChange({ ...safeResponse, explanation: e.target.value })
                 }
                 placeholder="Please explain your rating. If you want to highlight specific areas in the building, use the annotation tools below!"
                 rows={2}

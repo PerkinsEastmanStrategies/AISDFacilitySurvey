@@ -1,4 +1,4 @@
-import { SURVEY_QUESTIONS, type Annotation, type SurveyData } from "@/lib/survey-data";
+import { createEmptyResponses, type Annotation, type SurveyData } from "@/lib/survey-data";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { ReportSummary } from "@/lib/submit-survey";
 
@@ -61,11 +61,7 @@ interface DbSpaceAssignmentRoom {
 }
 
 function emptyResponses() {
-  return SURVEY_QUESTIONS.map((question) => ({
-    questionId: question.id,
-    rating: 0,
-    explanation: "",
-  }));
+  return createEmptyResponses();
 }
 
 function mapSubmissionListItem(row: DbSubmissionRow): SubmissionListItem {

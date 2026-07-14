@@ -15,11 +15,12 @@ import { getSchoolByName } from "@/lib/schools-data";
 import { fetchFloorPlanSvgByFilename, getAvailableFloors, prefetchFloorPlanSvgs, type FloorPlanLevel } from "@/lib/floor-plans";
 import { extractRoomsFromSvg, getSpaceColor, type RoomInfo } from "@/lib/spaces-data";
 import {
-  SURVEY_QUESTIONS,
   getQuestionsForRole,
   FCA_LIKERT_SCALE_NOTE,
   isRatingAnswered,
   SCHOOL_LEADER_FCA_QUESTION_IDS,
+  createEmptyResponses,
+  mergeSurveyResponses,
   type SurveyData,
   type QuestionResponse,
   type Annotation,
@@ -107,7 +108,7 @@ export default function SurveyApp({
   const [annotationTool, setAnnotationTool] = useState<Tool>("pan");
   const [annotationClassification, setAnnotationClassification] = useState<Classification>("strength");
   // Prefer floor plan by default — Mapbox WebGL is a common mobile tab-kill trigger.
-  const [rightView, setRightView] = useState<RightView>("floorplan");
+  const [rightView, setRightView] = useState<RightView>("map");
   const [annotationFilterMode, setAnnotationFilterMode] =
     useState<AnnotationFilterMode>("current");
   const [activeSpace, setActiveSpace] = useState<string | null>(null);
@@ -141,11 +142,7 @@ export default function SurveyApp({
     schoolDescription: "",
     uniqueFeatures: "",
     specialEducation: "",
-    responses: SURVEY_QUESTIONS.map((q) => ({
-      questionId: q.id,
-      rating: 0,
-      explanation: "",
-    })),
+    responses: createEmptyResponses(),
     annotations: [],
     svgContent: defaultSvg,
     spaceAssignments: {},
@@ -161,6 +158,8 @@ export default function SurveyApp({
       setActiveFloorId(draft.activeFloorId);
       setSurveyData((prev) => ({
         ...draft.surveyData,
+        // Fill any questions added after the draft was saved (P6/P7, etc.).
+        responses: mergeSurveyResponses(draft.surveyData.responses),
         svgContent: prev.svgContent,
       }));
       if (draft.step === "questions" || draft.step === "report") {
@@ -260,9 +259,12 @@ export default function SurveyApp({
 
   // Representative question for the right-hand annotation surface.
   const currentQuestion = currentPanel?.questions[0];
-  const currentResponse = surveyData.responses.find(
-    (r) => r.questionId === currentQuestion?.id
-  )!;
+  const currentResponse =
+    surveyData.responses.find((r) => r.questionId === currentQuestion?.id) ?? {
+      questionId: currentQuestion?.id ?? 0,
+      rating: 0,
+      explanation: "",
+    };
 
   // Whether we're on the dedicated "program space locations" question (Q14).
   const isSpacesQuestion = currentQuestion?.type === "spaces";
@@ -439,12 +441,19 @@ export default function SurveyApp({
   };
 
   const handleResponseChange = (response: QuestionResponse) => {
-    setSurveyData((prev) => ({
-      ...prev,
-      responses: prev.responses.map((r) =>
-        r.questionId === response.questionId ? response : r
-      ),
-    }));
+    setSurveyData((prev) => {
+      const hasResponse = prev.responses.some(
+        (r) => r.questionId === response.questionId
+      );
+      return {
+        ...prev,
+        responses: hasResponse
+          ? prev.responses.map((r) =>
+              r.questionId === response.questionId ? response : r
+            )
+          : [...prev.responses, response],
+      };
+    });
   };
 
   const handleAddAnnotation = (annotation: Omit<Annotation, "id">) => {
@@ -1090,9 +1099,14 @@ export default function SurveyApp({
                             </p>
                           </div>
                           {currentPanel.questions.map((q) => {
-                            const response = surveyData.responses.find(
-                              (r) => r.questionId === q.id
-                            )!;
+                            const response =
+                              surveyData.responses.find(
+                                (r) => r.questionId === q.id
+                              ) ?? {
+                                questionId: q.id,
+                                rating: 0,
+                                explanation: "",
+                              };
                             return (
                               <QuestionForm
                                 key={q.id}

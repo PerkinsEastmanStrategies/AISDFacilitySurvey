@@ -74,12 +74,19 @@ export function IntroForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [manifestSchools]);
 
+  const isOperations = data.role === "operations";
+  const isSchoolLeader = data.role === "school_leader";
+
+  const roleLabel =
+    data.role === "school_leader"
+      ? "School Leader (Principal/AP)"
+      : data.role === "operations"
+        ? "Operations Staff"
+        : null;
+
   const handleChange = (field: keyof SchoolInfo, value: string) => {
     onChange({ ...data, [field]: value });
   };
-
-  const isOperations = data.role === "operations";
-
   return (
     <Card className="gap-2 border-border/60 py-2.5 shadow-sm">
       <CardHeader className="px-2.5 pb-1.5">
@@ -139,20 +146,22 @@ export function IntroForm({
 
         <div className="space-y-1" data-tour="role-select">
           <Label htmlFor="role" className="text-[11px] font-semibold text-foreground">Your Role</Label>
-          <Select value={data.role} onValueChange={(v) => handleChange("role", v)}>
+          <Select value={data.role || null} onValueChange={(v) => handleChange("role", v ?? "")}>
             <SelectTrigger
               id="role"
               size="sm"
               className="h-auto w-full min-h-7 py-1.5 text-xs whitespace-normal [&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:whitespace-normal"
             >
-              <SelectValue placeholder="Select your role..." />
+              <SelectValue placeholder="Select your role...">
+                {roleLabel}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent className="min-w-[var(--anchor-width)] text-xs">
               <SelectItem value="school_leader">School Leader (Principal/AP)</SelectItem>
               <SelectItem value="operations">Operations Staff</SelectItem>
             </SelectContent>
           </Select>
-          {data.role === "school_leader" && (
+          {isSchoolLeader && (
             <p className="text-xs text-muted-foreground">
               School Leaders complete Educational Suitability plus seven campus
               condition questions covering the same key facility categories as
@@ -191,7 +200,7 @@ export function IntroForm({
           </div>
         </div>
 
-        {!isOperations && (
+        {isSchoolLeader && (
           <>
             <div className="space-y-1">
               <Label htmlFor="schoolDescription" className="text-xs font-semibold leading-snug text-foreground">

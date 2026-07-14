@@ -715,6 +715,35 @@ export interface QuestionResponse {
   ranking?: string[];
 }
 
+/** Empty response stubs for every survey question (used on init / draft migrate). */
+export function createEmptyResponses(): QuestionResponse[] {
+  return SURVEY_QUESTIONS.map((q) => ({
+    questionId: q.id,
+    rating: 0,
+    explanation: "",
+  }));
+}
+
+/**
+ * Merge saved responses onto the current question set so newly added questions
+ * (e.g. principal P6/P7) always have a stub and never crash the UI.
+ */
+export function mergeSurveyResponses(
+  saved: QuestionResponse[] | null | undefined
+): QuestionResponse[] {
+  const byId = new Map((saved ?? []).map((r) => [r.questionId, r]));
+  return createEmptyResponses().map((empty) => {
+    const existing = byId.get(empty.questionId);
+    if (!existing) return empty;
+    return {
+      questionId: empty.questionId,
+      rating: existing.rating ?? 0,
+      explanation: existing.explanation ?? "",
+      ranking: existing.ranking,
+    };
+  });
+}
+
 export type SurveyRole = "school_leader" | "operations";
 
 export interface SurveyData {
