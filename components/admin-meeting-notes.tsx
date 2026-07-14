@@ -3,9 +3,9 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
-  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { createPortal } from "react-dom";
@@ -25,14 +25,15 @@ import {
 
 const NOTES_DATA_PREFIX = "aisd-admin-meeting-notes:v2:";
 const NOTES_DATA_PREFIX_V1 = "aisd-admin-meeting-notes:v1:";
-const NOTES_SIZE_KEY = "aisd-admin-meeting-notes-size:v1";
+const NOTES_SIZE_KEY = "aisd-admin-meeting-notes-size:v2";
 
 const DEFAULT_WIDTH = 420;
 const DEFAULT_HEIGHT = 460;
 const MIN_WIDTH = 300;
 const MIN_HEIGHT = 280;
 const MINIMIZED_HEIGHT = 44;
-const EDGE_PAD = 16;
+const EDGE = 16;
+const OVERLAY_ID = "aisd-admin-notes-overlay-root";
 
 type MeetingNoteRecord = {
   assessors: string;
@@ -100,9 +101,7 @@ function loadNoteRecord(school: string): MeetingNoteRecord {
     const legacy = localStorage.getItem(
       `${NOTES_DATA_PREFIX_V1}${school.trim()}`
     );
-    if (legacy) {
-      return { ...emptyNote(), body: legacy };
-    }
+    if (legacy) return { ...emptyNote(), body: legacy };
   } catch {
     // ignore
   }
@@ -117,6 +116,41 @@ function saveNoteRecord(school: string, record: MeetingNoteRecord) {
   }
 }
 
+function viewportSize() {
+  const vv = window.visualViewport;
+  return {
+    width: vv?.width ?? window.innerWidth,
+    height: vv?.height ?? window.innerHeight,
+  };
+}
+
+function clampSize(width: number, height: number) {
+  const vp = viewportSize();
+  return {
+    width: Math.min(Math.max(MIN_WIDTH, width), Math.max(MIN_WIDTH, vp.width - EDGE * 2)),
+    height: Math.min(
+      Math.max(MIN_HEIGHT, height),
+      Math.max(MIN_HEIGHT, vp.height - EDGE * 2)
+    ),
+  };
+}
+
+function midRightPosition(width: number, height: number) {
+  const vp = viewportSize();
+  return {
+    x: Math.max(EDGE, vp.width - width - EDGE),
+    y: Math.max(EDGE, Math.round((vp.height - height) / 2)),
+  };
+}
+
+function clampPos(x: number, y: number, width: number, height: number) {
+  const vp = viewportSize();
+  return {
+    x: Math.min(Math.max(EDGE, x), Math.max(EDGE, vp.width - width - EDGE)),
+    y: Math.min(Math.max(EDGE, y), Math.max(EDGE, vp.height - height - EDGE)),
+  };
+}
+
 function loadSavedSize(): { width: number; height: number } {
   if (typeof window === "undefined") {
     return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
@@ -125,54 +159,42 @@ function loadSavedSize(): { width: number; height: number } {
     const raw = localStorage.getItem(NOTES_SIZE_KEY);
     if (!raw) return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
     const parsed = JSON.parse(raw) as { width?: number; height?: number };
-    return {
-      width:
-        typeof parsed.width === "number" && parsed.width >= MIN_WIDTH
-          ? parsed.width
-          : DEFAULT_WIDTH,
-      height:
-        typeof parsed.height === "number" && parsed.height >= MIN_HEIGHT
-          ? parsed.height
-          : DEFAULT_HEIGHT,
-    };
+    const width =
+      typeof parsed.width === "number" ? parsed.width : DEFAULT_WIDTH;
+    const height =
+      typeof parsed.height === "number" ? parsed.height : DEFAULT_HEIGHT;
+    // Reject near-fullscreen heights that used to pin the panel.
+    if (height > window.innerHeight * 0.75) {
+      return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+    }
+    return clampSize(width, height);
   } catch {
     return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
   }
 }
 
-function clampSize(width: number, height: number) {
-  if (typeof window === "undefined") {
-    return { width, height };
+function getOverlayRoot(): HTMLElement {
+  let root = document.getElementById(OVERLAY_ID);
+  if (!root) {
+    root = document.createElement("div");
+    root.id = OVERLAY_ID;
+    // Full-viewport layer attached to <html>, so placement is never relative
+    // to a transformed/scrolling subsection of the admin page.
+    root.setAttribute(
+      "style",
+      [
+        "position:fixed",
+        "inset:0",
+        "width:100vw",
+        "height:100vh",
+        "pointer-events:none",
+        "z-index:2147483000",
+        "overflow:visible",
+      ].join(";")
+    );
+    document.documentElement.appendChild(root);
   }
-  return {
-    width: Math.min(
-      Math.max(MIN_WIDTH, width),
-      window.innerWidth - EDGE_PAD * 2
-    ),
-    height: Math.min(
-      Math.max(MIN_HEIGHT, height),
-      window.innerHeight - EDGE_PAD * 2
-    ),
-  };
-}
-
-function clampPoint(
-  x: number,
-  y: number,
-  width: number,
-  height: number
-): { x: number; y: number } {
-  if (typeof window === "undefined") return { x, y };
-  return {
-    x: Math.min(
-      Math.max(EDGE_PAD, x),
-      Math.max(EDGE_PAD, window.innerWidth - width - EDGE_PAD)
-    ),
-    y: Math.min(
-      Math.max(EDGE_PAD, y),
-      Math.max(EDGE_PAD, window.innerHeight - height - EDGE_PAD)
-    ),
-  };
+  return root;
 }
 
 function formatCopyText(school: string, record: MeetingNoteRecord): string {
@@ -193,34 +215,31 @@ type AdminMeetingNotesProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-/**
- * Placement model:
- * - Default: CSS mid-right (`right` + `top: 50%` + `translateY(-50%)`) — no JS coords.
- * - After drag: switch to pixel `left`/`top` from the pointer.
- * - Reopening always resets to CSS mid-right.
- * - Portaled to document.body so parent layout can't skew `position: fixed`.
- */
 export function AdminMeetingNotes({
   school,
   open,
   onOpenChange,
 }: AdminMeetingNotesProps) {
   const [mounted, setMounted] = useState(false);
-  const [size, setSize] = useState(() => loadSavedSize());
+  const [size, setSize] = useState({
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
+  });
+  const [position, setPosition] = useState({ x: EDGE, y: EDGE });
   const [minimized, setMinimized] = useState(false);
-  const [dragged, setDragged] = useState(false);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
   const [record, setRecord] = useState<MeetingNoteRecord>(() => emptyNote());
   const [copied, setCopied] = useState(false);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
+    pointerId: number;
     startX: number;
     startY: number;
     originX: number;
     originY: number;
   } | null>(null);
   const resizeRef = useRef<{
+    pointerId: number;
     startX: number;
     startY: number;
     originW: number;
@@ -232,7 +251,11 @@ export function AdminMeetingNotes({
   const schoolRef = useRef(school);
   const recordRef = useRef(record);
   recordRef.current = record;
-  const expandedHeightRef = useRef(size.height);
+  const sizeRef = useRef(size);
+  sizeRef.current = size;
+  const positionRef = useRef(position);
+  positionRef.current = position;
+  const expandedHeightRef = useRef(DEFAULT_HEIGHT);
 
   useEffect(() => {
     setMounted(true);
@@ -244,12 +267,15 @@ export function AdminMeetingNotes({
     schoolRef.current = school;
   }, [school]);
 
-  // Every open: snap back to CSS mid-right (clear any dragged pixel placement).
-  useEffect(() => {
+  // Place mid-right in the viewport overlay whenever the panel opens.
+  useLayoutEffect(() => {
     if (!open) return;
-    setDragged(false);
+    const nextSize = loadSavedSize();
+    const placed = midRightPosition(nextSize.width, nextSize.height);
     setMinimized(false);
-    setSize((prev) => clampSize(prev.width, prev.height));
+    setSize(nextSize);
+    setPosition(placed);
+    expandedHeightRef.current = nextSize.height;
   }, [open]);
 
   useEffect(() => {
@@ -279,9 +305,8 @@ export function AdminMeetingNotes({
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
     }
-    const noteSchool = school;
     saveTimerRef.current = window.setTimeout(() => {
-      saveNoteRecord(noteSchool, record);
+      saveNoteRecord(school, record);
     }, 250);
     return () => {
       if (saveTimerRef.current !== null) {
@@ -290,94 +315,108 @@ export function AdminMeetingNotes({
     };
   }, [record, school]);
 
-  const endInteraction = useCallback(() => {
-    dragRef.current = null;
-    resizeRef.current = null;
+  // Keep inside the viewport if the window resizes.
+  useEffect(() => {
+    if (!open) return;
+    const onResize = () => {
+      const nextSize = clampSize(sizeRef.current.width, sizeRef.current.height);
+      setSize(nextSize);
+      setPosition((prev) =>
+        clampPos(
+          prev.x,
+          prev.y,
+          nextSize.width,
+          minimized ? MINIMIZED_HEIGHT : nextSize.height
+        )
+      );
+    };
+    window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
+    return () => {
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
+    };
+  }, [open, minimized]);
+
+  const onPointerMove = useCallback((event: PointerEvent) => {
+    if (dragRef.current && event.pointerId === dragRef.current.pointerId) {
+      const dx = event.clientX - dragRef.current.startX;
+      const dy = event.clientY - dragRef.current.startY;
+      const height = minimized ? MINIMIZED_HEIGHT : sizeRef.current.height;
+      setPosition(
+        clampPos(
+          dragRef.current.originX + dx,
+          dragRef.current.originY + dy,
+          sizeRef.current.width,
+          height
+        )
+      );
+      return;
+    }
+    if (resizeRef.current && event.pointerId === resizeRef.current.pointerId) {
+      const dx = event.clientX - resizeRef.current.startX;
+      const dy = event.clientY - resizeRef.current.startY;
+      const next = clampSize(
+        resizeRef.current.originW + dx,
+        resizeRef.current.originH + dy
+      );
+      expandedHeightRef.current = next.height;
+      setSize(next);
+      setPosition(
+        clampPos(
+          resizeRef.current.originX,
+          resizeRef.current.originY,
+          next.width,
+          next.height
+        )
+      );
+    }
+  }, [minimized]);
+
+  const onPointerUp = useCallback((event: PointerEvent) => {
+    if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+    if (resizeRef.current?.pointerId === event.pointerId) resizeRef.current = null;
   }, []);
 
   useEffect(() => {
-    const onMove = (event: PointerEvent) => {
-      if (dragRef.current) {
-        const dx = event.clientX - dragRef.current.startX;
-        const dy = event.clientY - dragRef.current.startY;
-        const height = minimized ? MINIMIZED_HEIGHT : size.height;
-        setPosition(
-          clampPoint(
-            dragRef.current.originX + dx,
-            dragRef.current.originY + dy,
-            size.width,
-            height
-          )
-        );
-        return;
-      }
-      if (resizeRef.current && !minimized) {
-        const dx = event.clientX - resizeRef.current.startX;
-        const dy = event.clientY - resizeRef.current.startY;
-        const next = clampSize(
-          resizeRef.current.originW + dx,
-          resizeRef.current.originH + dy
-        );
-        setSize(next);
-        expandedHeightRef.current = next.height;
-        setPosition(
-          clampPoint(
-            resizeRef.current.originX,
-            resizeRef.current.originY,
-            next.width,
-            next.height
-          )
-        );
-      }
-    };
-    const onUp = () => endInteraction();
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onUp);
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
     return () => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
     };
-  }, [endInteraction, minimized, size.height, size.width]);
+  }, [onPointerMove, onPointerUp]);
 
-  const startDrag = (event: ReactPointerEvent) => {
+  const startDrag = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0) return;
     event.preventDefault();
-    const el = panelRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    // First drag leaves CSS anchoring and locks to pixel coords.
-    if (!dragged) {
-      setDragged(true);
-      setPosition({ x: rect.left, y: rect.top });
-    }
+    event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
+      pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originX: dragged ? position.x : rect.left,
-      originY: dragged ? position.y : rect.top,
+      originX: positionRef.current.x,
+      originY: positionRef.current.y,
     };
   };
 
-  const startResize = (event: ReactPointerEvent) => {
+  const startResize = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.button !== 0 || minimized) return;
     event.preventDefault();
     event.stopPropagation();
-    const el = panelRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    if (!dragged) {
-      setDragged(true);
-      setPosition({ x: rect.left, y: rect.top });
-    }
+    event.currentTarget.setPointerCapture(event.pointerId);
     resizeRef.current = {
+      pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
-      originW: size.width,
-      originH: size.height,
-      originX: dragged ? position.x : rect.left,
-      originY: dragged ? position.y : rect.top,
+      originW: sizeRef.current.width,
+      originH: sizeRef.current.height,
+      originX: positionRef.current.x,
+      originY: positionRef.current.y,
     };
   };
 
@@ -417,12 +456,15 @@ export function AdminMeetingNotes({
   const toggleMinimized = () => {
     setMinimized((prev) => {
       if (prev) {
-        setSize((s) =>
-          clampSize(s.width, Math.max(MIN_HEIGHT, expandedHeightRef.current))
+        const next = clampSize(
+          sizeRef.current.width,
+          Math.max(MIN_HEIGHT, expandedHeightRef.current)
         );
+        setSize(next);
+        setPosition((p) => clampPos(p.x, p.y, next.width, next.height));
         return false;
       }
-      expandedHeightRef.current = Math.max(MIN_HEIGHT, size.height);
+      expandedHeightRef.current = Math.max(MIN_HEIGHT, sizeRef.current.height);
       return true;
     });
   };
@@ -431,35 +473,26 @@ export function AdminMeetingNotes({
 
   const panelHeight = minimized ? MINIMIZED_HEIGHT : size.height;
 
-  // Default placement is pure CSS — mid-right of the viewport.
-  const panelStyle: CSSProperties = dragged
-    ? {
-        left: position.x,
-        top: position.y,
-        right: "auto",
-        width: size.width,
-        height: panelHeight,
-        transform: "none",
-      }
-    : {
-        right: EDGE_PAD,
-        top: "50%",
-        left: "auto",
-        width: size.width,
-        height: panelHeight,
-        transform: "translateY(-50%)",
-      };
-
   return createPortal(
     <div
       ref={panelRef}
-      className="fixed z-[200] relative flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
-      style={panelStyle}
+      className="relative flex flex-col overflow-hidden rounded-xl border border-border bg-card text-card-foreground shadow-2xl"
+      style={{
+        position: "absolute",
+        left: position.x,
+        top: position.y,
+        width: size.width,
+        height: panelHeight,
+        pointerEvents: "auto",
+        zIndex: 1,
+        touchAction: "none",
+      }}
       role="dialog"
       aria-label="Meeting notes"
     >
       <div
         className="flex h-11 shrink-0 cursor-grab items-center gap-2 border-b border-border bg-muted/50 px-2 active:cursor-grabbing"
+        style={{ touchAction: "none" }}
         onPointerDown={startDrag}
       >
         <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -594,15 +627,16 @@ export function AdminMeetingNotes({
             </div>
           </div>
           <div
-            className="absolute bottom-0 right-0 h-4 w-4 cursor-se-resize"
+            className="absolute bottom-0 right-0 h-5 w-5 cursor-se-resize"
+            style={{ touchAction: "none" }}
             onPointerDown={startResize}
             aria-label="Resize notes window"
           >
-            <div className="absolute bottom-1 right-1 h-2 w-2 border-b-2 border-r-2 border-muted-foreground/50" />
+            <div className="absolute bottom-1.5 right-1.5 h-2 w-2 border-b-2 border-r-2 border-muted-foreground/60" />
           </div>
         </>
       )}
     </div>,
-    document.body
+    getOverlayRoot()
   );
 }
