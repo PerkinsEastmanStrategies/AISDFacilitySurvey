@@ -1097,6 +1097,26 @@ export default function SurveyApp({
                                 : "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree)."}
                             </p>
                           </div>
+                          {currentPanel.questions.map((q) => {
+                            const response =
+                              surveyData.responses.find(
+                                (r) => r.questionId === q.id
+                              ) ?? {
+                                questionId: q.id,
+                                rating: 0,
+                                explanation: "",
+                              };
+                            return (
+                              <QuestionForm
+                                key={`rating-${q.id}`}
+                                questionId={q.id}
+                                response={response}
+                                onChange={handleResponseChange}
+                                compact
+                                parts="prompt-rating"
+                              />
+                            );
+                          })}
                           <div data-tour="annotation-toolbar">
                             <AnnotationToolbar
                               tool={annotationTool}
@@ -1118,35 +1138,47 @@ export default function SurveyApp({
                               };
                             return (
                               <QuestionForm
-                                key={q.id}
+                                key={`explain-${q.id}`}
                                 questionId={q.id}
                                 response={response}
                                 onChange={handleResponseChange}
                                 compact
+                                parts="explanation"
                               />
                             );
                           })}
                         </div>
+                      ) : isRankingPanel || isTextPanel ? (
+                        <QuestionForm
+                          questionId={currentQuestion.id}
+                          response={currentResponse}
+                          onChange={handleResponseChange}
+                        />
                       ) : (
-                        <>
-                          {!isRankingPanel && !isTextPanel && (
-                            <div data-tour="annotation-toolbar">
-                              <AnnotationToolbar
-                                tool={annotationTool}
-                                classification={annotationClassification}
-                                currentColor={currentPanel.color}
-                                onToolChange={setAnnotationTool}
-                                onClassificationChange={setAnnotationClassification}
-                                disabled={!surveyData.svgContent}
-                              />
-                            </div>
-                          )}
+                        <div className="space-y-2">
                           <QuestionForm
                             questionId={currentQuestion.id}
                             response={currentResponse}
                             onChange={handleResponseChange}
+                            parts="prompt-rating"
                           />
-                        </>
+                          <div data-tour="annotation-toolbar">
+                            <AnnotationToolbar
+                              tool={annotationTool}
+                              classification={annotationClassification}
+                              currentColor={currentPanel.color}
+                              onToolChange={setAnnotationTool}
+                              onClassificationChange={setAnnotationClassification}
+                              disabled={!surveyData.svgContent}
+                            />
+                          </div>
+                          <QuestionForm
+                            questionId={currentQuestion.id}
+                            response={currentResponse}
+                            onChange={handleResponseChange}
+                            parts="explanation"
+                          />
+                        </div>
                       )}
 
                       {!isRankingPanel && !isTextPanel && (

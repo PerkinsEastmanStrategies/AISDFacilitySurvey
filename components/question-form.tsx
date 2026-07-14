@@ -16,6 +16,11 @@ import {
 } from "@/lib/survey-data";
 import { CategoryRanking } from "./category-ranking";
 
+const EXPLANATION_PLACEHOLDER =
+  "Please explain your rating. Please use the annotation tools above to mark specific areas on the floor plan or site map.";
+
+export type QuestionFormParts = "full" | "prompt-rating" | "explanation";
+
 interface QuestionFormProps {
   questionId: number;
   response: QuestionResponse;
@@ -26,9 +31,20 @@ interface QuestionFormProps {
    * once by the parent panel) and tightens spacing.
    */
   compact?: boolean;
+  /**
+   * Split rating questions so annotation tools can sit between the 1–5 scale
+   * and the explanation box: `prompt-rating` then tools then `explanation`.
+   */
+  parts?: QuestionFormParts;
 }
 
-export function QuestionForm({ questionId, response, onChange, compact = false }: QuestionFormProps) {
+export function QuestionForm({
+  questionId,
+  response,
+  onChange,
+  compact = false,
+  parts = "full",
+}: QuestionFormProps) {
   const question = SURVEY_QUESTIONS.find((q) => q.id === questionId);
   const safeResponse = response ?? {
     questionId,
@@ -41,6 +57,7 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
   const isFca = isFacilityConditionQuestion(question);
   const questionCode = "questionCode" in question ? question.questionCode : undefined;
   const tip = "tip" in question && typeof question.tip === "string" ? question.tip : undefined;
+  const area = "area" in question ? question.area : undefined;
 
   const getRatingLabel = (rating: number) => {
     if (rating === 0) return "Select a rating";
@@ -119,8 +136,57 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
     );
   };
 
+  const renderExplanationField = (opts?: {
+    compact?: boolean;
+    showQuestionHint?: boolean;
+  }) => (
+    <div className="space-y-1" data-tour="explanation">
+      <Label
+        htmlFor={`explanation-${questionId}`}
+        className="text-[11px] font-medium text-foreground"
+      >
+        Please explain your rating
+        {opts?.showQuestionHint && (area || questionCode) ? (
+          <span className="font-normal text-muted-foreground">
+            {" "}
+            ({[questionCode, area].filter(Boolean).join(" · ")})
+          </span>
+        ) : null}
+      </Label>
+      <Textarea
+        id={`explanation-${questionId}`}
+        value={safeResponse.explanation}
+        onChange={(e) =>
+          onChange({ ...safeResponse, explanation: e.target.value })
+        }
+        placeholder={EXPLANATION_PLACEHOLDER}
+        rows={opts?.compact ? 1 : 2}
+        className={
+          opts?.compact
+            ? "min-h-7 resize-none px-1.5 py-1 text-[10px] md:text-[10px]"
+            : "resize-none text-[10px] md:text-[10px]"
+        }
+      />
+    </div>
+  );
+
+  // Compact / full split: explanation-only block (after Mark Locations).
+  if (parts === "explanation" && question.type === "rating") {
+    if (compact) {
+      return (
+        <div className="rounded-md border border-border/60 bg-card p-2 shadow-sm">
+          {renderExplanationField({ compact: true, showQuestionHint: true })}
+        </div>
+      );
+    }
+    return (
+      <div className="rounded-md border border-border/60 bg-card p-2.5 shadow-sm">
+        {renderExplanationField()}
+      </div>
+    );
+  }
+
   if (compact && question.type === "rating") {
-    const area = "area" in question ? question.area : undefined;
     return (
       <div className="rounded-md border border-border/60 bg-card p-2 shadow-sm">
         <div className="flex items-start gap-1">
@@ -154,48 +220,48 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
           </span>
         </div>
 
-        <Textarea
-          value={safeResponse.explanation}
-          onChange={(e) => onChange({ ...safeResponse, explanation: e.target.value })}
-          placeholder="Please explain your rating. Please use the annotation tools above to mark specific areas on the floor plan or site map."
-          rows={1}
-          className="mt-1.5 min-h-7 resize-none px-1.5 py-1 text-[10px] md:text-[10px]"
-        />
+        {parts === "full" && (
+          <div className="mt-1.5">
+            {renderExplanationField({ compact: true })}
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <Card className="gap-2 border-border/60 py-2.5 shadow-sm">
-      <CardHeader className="px-2.5 pb-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {question.section}
-          </span>
-        </div>
-        <div className="mt-px flex items-center gap-1">
-          <Badge
-            style={{ backgroundColor: question.color }}
-            className="px-1.5 py-px text-[9px] text-white"
-          >
-            {question.category}
-          </Badge>
-          {questionCode && (
-            <Badge variant="outline" className="font-mono text-[9px]">
-              {questionCode}
+      {(parts === "full" || parts === "prompt-rating") && (
+        <CardHeader className="px-2.5 pb-1.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+              {question.section}
+            </span>
+          </div>
+          <div className="mt-px flex items-center gap-1">
+            <Badge
+              style={{ backgroundColor: question.color }}
+              className="px-1.5 py-px text-[9px] text-white"
+            >
+              {question.category}
             </Badge>
+            {questionCode && (
+              <Badge variant="outline" className="font-mono text-[9px]">
+                {questionCode}
+              </Badge>
+            )}
+          </div>
+          <CardTitle className="mt-1 font-sans text-xs font-bold leading-snug text-foreground">
+            {question.text}
+          </CardTitle>
+          {tip && (
+            <p className="mt-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+              <span className="font-semibold text-foreground">Tip: </span>
+              {tip}
+            </p>
           )}
-        </div>
-        <CardTitle className="mt-1 font-sans text-xs font-bold leading-snug text-foreground">
-          {question.text}
-        </CardTitle>
-        {tip && (
-          <p className="mt-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
-            <span className="font-semibold text-foreground">Tip: </span>
-            {tip}
-          </p>
-        )}
-      </CardHeader>
+        </CardHeader>
+      )}
       <CardContent className="space-y-3 px-2.5">
         {question.type === "ranking" ? (
           <div className="space-y-1.5" data-tour="ranking">
@@ -248,35 +314,24 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
           </div>
         ) : (
           <>
-            <div className="space-y-2" data-tour="rating">
-              <div className="flex items-center justify-between">
-                <Label className="text-[11px] text-foreground">Rating</Label>
-                <span className="text-[11px] font-medium text-muted-foreground">
-                  {getRatingLabel(safeResponse.rating)}
-                </span>
+            {(parts === "full" || parts === "prompt-rating") && (
+              <div className="space-y-2" data-tour="rating">
+                <div className="flex items-center justify-between">
+                  <Label className="text-[11px] text-foreground">Rating</Label>
+                  <span className="text-[11px] font-medium text-muted-foreground">
+                    {getRatingLabel(safeResponse.rating)}
+                  </span>
+                </div>
+
+                <p className="text-[9px] text-muted-foreground">
+                  1 = Strongly Disagree · 3 = Neutral · 5 = Strongly Agree
+                </p>
+                <div className="flex justify-center">{renderRatingButtons("md")}</div>
               </div>
+            )}
 
-              <p className="text-[9px] text-muted-foreground">
-                1 = Strongly Disagree · 3 = Neutral · 5 = Strongly Agree
-              </p>
-              <div className="flex justify-center">{renderRatingButtons("md")}</div>
-            </div>
-
-            <div className="space-y-1" data-tour="explanation">
-              <Label htmlFor="explanation" className="text-[11px] font-medium text-foreground">
-                Please explain your rating
-              </Label>
-              <Textarea
-                id="explanation"
-                value={safeResponse.explanation}
-                onChange={(e) =>
-                  onChange({ ...safeResponse, explanation: e.target.value })
-                }
-                placeholder="Please explain your rating. Please use the annotation tools above to mark specific areas on the floor plan or site map."
-                rows={2}
-                className="resize-none text-[10px] md:text-[10px]"
-              />
-            </div>
+            {(parts === "full" || parts === "explanation") &&
+              renderExplanationField()}
           </>
         )}
       </CardContent>
