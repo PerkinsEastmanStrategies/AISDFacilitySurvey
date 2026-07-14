@@ -23,7 +23,7 @@ import {
 
 const NOTES_DATA_PREFIX = "aisd-admin-meeting-notes:v2:";
 const NOTES_DATA_PREFIX_V1 = "aisd-admin-meeting-notes:v1:";
-const NOTES_UI_KEY = "aisd-admin-meeting-notes-ui:v2";
+const NOTES_UI_KEY = "aisd-admin-meeting-notes-ui:v3";
 
 const DEFAULT_WIDTH = 420;
 const DEFAULT_HEIGHT = 440;
@@ -127,11 +127,12 @@ function saveNoteRecord(school: string, record: MeetingNoteRecord) {
 
 function defaultPosition(width: number, height: number): { x: number; y: number } {
   if (typeof window === "undefined") {
-    return { x: EDGE_PAD, y: EDGE_PAD };
+    return { x: EDGE_PAD, y: 72 };
   }
   return {
     x: Math.max(EDGE_PAD, window.innerWidth - width - EDGE_PAD),
-    y: Math.max(EDGE_PAD, window.innerHeight - height - EDGE_PAD),
+    // Near the top, just under the sticky admin header
+    y: 72,
   };
 }
 
@@ -143,7 +144,7 @@ function loadUiState(): PanelUiState {
     width,
     height,
     minimized: false,
-    open: true,
+    open: false,
   };
   if (typeof window === "undefined") return fallback;
   try {
@@ -162,7 +163,8 @@ function loadUiState(): PanelUiState {
           ? parsed.height
           : fallback.height,
       minimized: Boolean(parsed.minimized),
-      open: parsed.open !== false,
+      // Always start closed — open from the header Notes button
+      open: false,
     };
   } catch {
     return fallback;
@@ -271,7 +273,7 @@ export function AdminMeetingNotes({
     setMinimized(ui.minimized);
     setRecord(loadNoteRecord(school));
     schoolRef.current = school;
-    onOpenChange(ui.open);
+    onOpenChange(false);
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate on mount only
   }, []);

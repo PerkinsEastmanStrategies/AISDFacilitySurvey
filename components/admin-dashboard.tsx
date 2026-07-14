@@ -101,7 +101,7 @@ export function AdminDashboard() {
   const [listLoading, setListLoading] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [notesOpen, setNotesOpen] = useState(true);
+  const [notesOpen, setNotesOpen] = useState(false);
 
   useEffect(() => {
     const stored = sessionStorage.getItem(ADMIN_KEY_STORAGE);
@@ -484,11 +484,11 @@ export function AdminDashboard() {
                 All schools
               </Button>
             )}
-            {!notesOpen && selectedSchool && view === "detail" && (
+            {selectedSchool && view === "detail" && (
               <Button
-                variant="outline"
+                variant={notesOpen ? "default" : "outline"}
                 size="sm"
-                onClick={() => setNotesOpen(true)}
+                onClick={() => setNotesOpen((open) => !open)}
                 className="gap-1.5"
               >
                 <StickyNote className="h-4 w-4" />
