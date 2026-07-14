@@ -495,7 +495,7 @@ export const SURVEY_QUESTIONS = [
     color: "hsl(280, 60%, 50%)",
   },
   // School Leader (principal) simplified facility condition questions —
-  // six combined prompts covering every Operations FCA category.
+  // seven combined prompts covering every Operations FCA category.
   // Each is its own step (like Educational Suitability), not a category group.
   {
     id: 54,
@@ -528,18 +528,18 @@ export const SURVEY_QUESTIONS = [
     section: "Facility Condition",
     type: "rating",
     color: "hsl(35, 70%, 48%)",
-    tip: "Consider worn flooring, damaged walls, stained or missing ceiling tiles, and whether restrooms feel well maintained and fully functional.",
+    tip: "Consider worn flooring, damaged walls, stained or missing ceiling tiles, and whether restrooms feel well maintained and fully functional. Use the plumbing question for fixture and pipe issues.",
   },
   {
     id: 57,
     questionCode: "P4",
-    text: "Heating, cooling, ventilation, plumbing, lighting, and electrical service reliably support comfortable and continuous school operations.",
-    category: "Building Systems",
-    area: "HVAC, Plumbing & Electrical",
+    text: "Heating, cooling, and ventilation reliably provide comfortable temperatures and acceptable indoor air quality throughout occupied spaces.",
+    category: "Heating & Cooling",
+    area: "Heating & Cooling",
     section: "Facility Condition",
     type: "rating",
     color: "hsl(190, 65%, 42%)",
-    tip: "Include hot/cold classrooms, air quality concerns, noisy equipment, recurring plumbing leaks or fixture failures, dim/flickering lights, and power outages. Mark locations on the floor plan when you can.",
+    tip: "Include hot or cold classrooms, uneven temperatures by wing or floor, poor air quality, and noisy HVAC equipment. Mark problem areas on the floor plan when you can.",
   },
   {
     id: 58,
@@ -555,18 +555,29 @@ export const SURVEY_QUESTIONS = [
   {
     id: 59,
     questionCode: "P6",
-    text: "Specialty spaces (gym, cafeteria/kitchen, auditorium/stage, labs, shops, music rooms, etc.) are in good physical condition, and overall the facility rarely disrupts teaching and learning.",
-    category: "Specialty Areas & Overall",
-    area: "Specialty Areas & Overall Condition",
+    text: "Plumbing systems and fixtures operate reliably throughout the facility, with few recurring leaks or water-related issues.",
+    category: "Plumbing",
+    area: "Plumbing",
     section: "Facility Condition",
     type: "rating",
-    color: "hsl(280, 60%, 50%)",
-    tip: "If issues are limited to certain specialty rooms, note them here (and pin them on the plan). Also reflect whether building problems frequently interrupt classes or school programs.",
+    color: "hsl(200, 70%, 45%)",
+    tip: "Include clogged drains, non-working toilets/sinks/fountains, low water pressure, recurring plumbing leaks, and any water damage that seems tied to pipes or fixtures rather than the roof.",
+  },
+  {
+    id: 60,
+    questionCode: "P7",
+    text: "Interior lighting, electrical service, and emergency lighting are reliable and adequate for daily school operations.",
+    category: "Electrical & Lighting",
+    area: "Electrical & Lighting",
+    section: "Facility Condition",
+    type: "rating",
+    color: "hsl(45, 80%, 45%)",
+    tip: "Include dim or flickering lights, dark areas of the building, frequent bulb/ballast failures, power outages or tripped circuits, and whether emergency lighting appears ready for use.",
   },
 ] as const;
 
 /** Simplified Facility Condition questions shown only to School Leaders. */
-export const SCHOOL_LEADER_FCA_QUESTION_IDS = new Set([54, 55, 56, 57, 58, 59]);
+export const SCHOOL_LEADER_FCA_QUESTION_IDS = new Set([54, 55, 56, 57, 58, 59, 60]);
 
 /** Sentinel rating for FCA "I don't know" — counts as answered but excluded from scoring. */
 export const DONT_KNOW_RATING = -1;
@@ -631,7 +642,7 @@ export type SurveyQuestion = (typeof SURVEY_QUESTIONS)[number];
 
 /**
  * Returns the questions a given role should answer.
- * - School Leaders: Educational Suitability + six combined Campus Condition prompts.
+ * - School Leaders: Educational Suitability + seven combined Campus Condition prompts.
  * - Operations Staff: the full Facility Condition (FCA) question set only.
  */
 export function getQuestionsForRole(role: SurveyData["role"]): SurveyQuestion[] {

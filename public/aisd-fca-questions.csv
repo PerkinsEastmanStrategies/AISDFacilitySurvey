@@ -1,0 +1,43 @@
+audience,question_code,question_id,category,area,question_text,tip
+Operations,A1,19,General,Overall Facility,"The overall physical condition of this facility is good and supports our operations.",
+Operations,A2,20,General,Recurring Issues,"Building-related issues rarely disrupt normal school activities.",
+Operations,A3,21,General,Recent Changes,"The physical condition of this facility has not noticeably changed over the last 5 years.",
+Operations,B1,22,Site & Grounds,Parking & Drives,"Parking lots and drive areas are in good physical condition.",
+Operations,B2,23,Site & Grounds,Sidewalks & Exterior Surfaces,"Sidewalks and exterior walking surfaces are in good physical condition.",
+Operations,B3,24,Site & Grounds,Drainage,"The site provides effective drainage with minimal standing water or muddy areas.",
+Operations,B4,25,Site & Grounds,Site Settlement / Erosion,"The site is free from significant erosion, settlement, or uneven pavement and sidewalks.",
+Operations,B5,26,Site & Grounds,Outdoor Areas,"Outdoor activity areas are in good physical condition.",
+Operations,C1,27,Building Exterior,Roofing,"The roof effectively prevents leaks and water intrusion.",
+Operations,C2,28,Building Exterior,Exterior Walls & Windows,"Exterior walls and windows are in good physical condition.",
+Operations,C3,29,Building Exterior,Exterior Doors,"Exterior doors function reliably and operate as intended.",
+Operations,D1,30,Interior Conditions,Ceilings,"Ceilings throughout the building are in good condition.",
+Operations,D2,31,Interior Conditions,Flooring,"Flooring throughout the building is in good condition.",
+Operations,D3,32,Interior Conditions,Walls & Finishes,"Interior walls and finishes are in good condition.",
+Operations,D4,33,Interior Conditions,Restrooms,"Restrooms are in good physical condition and function reliably.",
+Operations,E1,34,Heating & Cooling,Heating,"Heating systems provide comfortable temperatures throughout occupied spaces.",
+Operations,E2,35,Heating & Cooling,Cooling,"Cooling systems provide comfortable temperatures throughout occupied spaces.",
+Operations,E3,36,Heating & Cooling,Ventilation / Air Quality,"Ventilation and indoor air quality meet the needs of building occupants.",
+Operations,E4,37,Heating & Cooling,Noise,"Building systems operate without creating disruptive noise or vibration.",
+Operations,F1,38,Plumbing,Plumbing Reliability,"Plumbing systems operate reliably throughout the facility.",
+Operations,F2,39,Plumbing,Restroom Fixtures,"Restroom plumbing fixtures function reliably and are well maintained.",
+Operations,F3,40,Plumbing,Water Intrusion,"The building is free from recurring plumbing leaks or water-related issues.",
+Operations,G1,41,Electrical & Lighting,Interior Lighting,"Interior lighting is reliable and provides adequate illumination throughout the building.",
+Operations,G2,42,Electrical & Lighting,Power Reliability,"Electrical service is reliable with minimal power disruptions.",
+Operations,G3,43,Electrical & Lighting,Emergency Lighting,"Emergency lighting appears functional and ready for use.",
+Operations,H1,44,Safety & Security,Fire Alarm Systems,"Fire alarm systems appear reliable and fully functional.",
+Operations,H2,45,Safety & Security,Security Systems,"Building security systems and entry controls operate reliably.",
+Operations,H3,46,Safety & Security,Safety Concerns,"The facility provides a safe physical environment for students and staff.",
+Operations,H4,47,Safety & Security,Emergency Events,"Building systems perform reliably during emergency events and drills.",
+Operations,I1,48,Accessibility,Accessibility Features,"Accessibility features are functional and effectively support building users.",
+Operations,I2,49,Accessibility,Elevators / Lifts,"Elevators and lifts operate reliably when needed.",
+Operations,J1,50,Specialty Areas,Gymnasium & Athletic Areas,"Gymnasiums and athletic facilities are in good physical condition.",
+Operations,J2,51,Specialty Areas,Cafeteria & Kitchen Areas,"Cafeteria and kitchen areas are in good physical condition.",
+Operations,J3,52,Specialty Areas,Auditorium / Stage Areas,"Auditorium and stage areas are in good physical condition.",
+Operations,J4,53,Specialty Areas,Specialty Classrooms,"Specialty classrooms (labs, shops, music rooms, etc.) are in good physical condition.",
+Principal,P1,54,Site & Grounds,Site & Grounds,"Parking lots, drives, sidewalks, drainage, and outdoor activity areas (playgrounds, fields, courtyards) are in good physical condition and safe for daily use.","Think about potholes, uneven pavement, standing water, muddy spots, erosion, and the condition of play/athletic areas and arrival zones."
+Principal,P2,55,Building Exterior,Roof & Building Exterior,"The roof, exterior walls, windows, and exterior doors keep the building dry and secure, and are in good physical condition.","Include roof leak answers here — active leaks, stained ceiling tiles, bucket placements during rain, and water intrusion near windows or exterior walls. Also note sticky or unreliable exterior doors."
+Principal,P3,56,Interior Conditions,Interior Conditions,"Interior ceilings, flooring, walls/finishes, and restrooms throughout the building are in good physical condition.","Consider worn flooring, damaged walls, stained or missing ceiling tiles, and whether restrooms feel well maintained and fully functional. Use the plumbing question for fixture and pipe issues."
+Principal,P4,57,Heating & Cooling,Heating & Cooling,"Heating, cooling, and ventilation reliably provide comfortable temperatures and acceptable indoor air quality throughout occupied spaces.","Include hot or cold classrooms, uneven temperatures by wing or floor, poor air quality, and noisy HVAC equipment. Mark problem areas on the floor plan when you can."
+Principal,P5,58,"Safety, Security & Accessibility","Safety, Security & Accessibility","Fire/life-safety systems, building security and entry controls, and accessibility features (including elevators/lifts, where present) work reliably and support a safe campus.","Think about fire alarms, secure entry reliability during the school day, physical safety concerns, emergency drill issues, and accessibility barriers for students or staff."
+Principal,P6,59,Plumbing,Plumbing,"Plumbing systems and fixtures operate reliably throughout the facility, with few recurring leaks or water-related issues.","Include clogged drains, non-working toilets/sinks/fountains, low water pressure, recurring plumbing leaks, and any water damage that seems tied to pipes or fixtures rather than the roof."
+Principal,P7,60,Electrical & Lighting,Electrical & Lighting,"Interior lighting, electrical service, and emergency lighting are reliable and adequate for daily school operations.","Include dim or flickering lights, dark areas of the building, frequent bulb/ballast failures, power outages or tripped circuits, and whether emergency lighting appears ready for use."
