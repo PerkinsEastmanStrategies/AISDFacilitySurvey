@@ -555,13 +555,13 @@ export const SURVEY_QUESTIONS = [
   {
     id: 59,
     questionCode: "P6",
-    text: "Plumbing systems and fixtures operate reliably throughout the facility, with few recurring leaks or water-related issues.",
+    text: "Plumbing systems and fixtures operate reliably throughout the facility, and the plumbing is not outdated or aged beyond useful condition.",
     category: "Plumbing",
     area: "Plumbing",
     section: "Facility Condition",
     type: "rating",
     color: "hsl(200, 70%, 45%)",
-    tip: "Include clogged drains, non-working toilets/sinks/fountains, low water pressure, recurring plumbing leaks, and any water damage that seems tied to pipes or fixtures rather than the roof.",
+    tip: "Include clogged drains, non-working toilets/sinks/fountains, low water pressure, and whether fixtures or piping feel outdated, worn, or past useful life.",
   },
   {
     id: 60,
