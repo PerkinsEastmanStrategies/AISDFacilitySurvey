@@ -1097,6 +1097,16 @@ export default function SurveyApp({
                                 : "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree)."}
                             </p>
                           </div>
+                          <div data-tour="annotation-toolbar">
+                            <AnnotationToolbar
+                              tool={annotationTool}
+                              classification={annotationClassification}
+                              currentColor={currentPanel.color}
+                              onToolChange={setAnnotationTool}
+                              onClassificationChange={setAnnotationClassification}
+                              disabled={!surveyData.svgContent}
+                            />
+                          </div>
                           {currentPanel.questions.map((q) => {
                             const response =
                               surveyData.responses.find(
@@ -1118,27 +1128,29 @@ export default function SurveyApp({
                           })}
                         </div>
                       ) : (
-                        <QuestionForm
-                          questionId={currentQuestion.id}
-                          response={currentResponse}
-                          onChange={handleResponseChange}
-                        />
+                        <>
+                          {!isRankingPanel && !isTextPanel && (
+                            <div data-tour="annotation-toolbar">
+                              <AnnotationToolbar
+                                tool={annotationTool}
+                                classification={annotationClassification}
+                                currentColor={currentPanel.color}
+                                onToolChange={setAnnotationTool}
+                                onClassificationChange={setAnnotationClassification}
+                                disabled={!surveyData.svgContent}
+                              />
+                            </div>
+                          )}
+                          <QuestionForm
+                            questionId={currentQuestion.id}
+                            response={currentResponse}
+                            onChange={handleResponseChange}
+                          />
+                        </>
                       )}
 
                       {!isRankingPanel && !isTextPanel && (
                         <>
-                          {/* Annotation Toolbar - Under Questions */}
-                          <div data-tour="annotation-toolbar">
-                            <AnnotationToolbar
-                              tool={annotationTool}
-                              classification={annotationClassification}
-                              currentColor={currentPanel.color}
-                              onToolChange={setAnnotationTool}
-                              onClassificationChange={setAnnotationClassification}
-                              disabled={!surveyData.svgContent}
-                            />
-                          </div>
-
                           {renderMobileViewerWindow()}
 
                           {/* Annotation Summary for Current Panel */}

@@ -157,7 +157,7 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
         <Textarea
           value={safeResponse.explanation}
           onChange={(e) => onChange({ ...safeResponse, explanation: e.target.value })}
-          placeholder="Please explain your rating. Please use the tools below to mark specific areas on the floor plan or site map."
+          placeholder="Please explain your rating. Please use the annotation tools above to mark specific areas on the floor plan or site map."
           rows={1}
           className="mt-1.5 min-h-7 resize-none px-1.5 py-1 text-[10px] md:text-[10px]"
         />
@@ -272,7 +272,7 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
                 onChange={(e) =>
                   onChange({ ...safeResponse, explanation: e.target.value })
                 }
-                placeholder="Please explain your rating. Please use the tools below to mark specific areas on the floor plan or site map."
+                placeholder="Please explain your rating. Please use the annotation tools above to mark specific areas on the floor plan or site map."
                 rows={2}
                 className="resize-none text-[10px] md:text-[10px]"
               />
