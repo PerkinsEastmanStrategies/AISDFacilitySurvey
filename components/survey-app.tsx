@@ -9,7 +9,6 @@ import { IntroForm } from "@/components/intro-form";
 import { QuestionForm } from "@/components/question-form";
 import { FloorPlanViewer } from "@/components/floor-plan-viewer";
 import { MapViewer } from "@/components/map-viewer";
-import { ReportView } from "@/components/report-view";
 import { SpaceAssignmentForm } from "@/components/space-assignment-form";
 import { getSchoolByName } from "@/lib/schools-data";
 import { fetchFloorPlanSvgByFilename, getAvailableFloors, prefetchFloorPlanSvgs, type FloorPlanLevel } from "@/lib/floor-plans";
@@ -30,18 +29,19 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  FileText,
   ClipboardList,
   Map as MapIcon,
   LayoutGrid,
   HelpCircle,
   Filter,
+  Send,
+  Loader2,
+  CheckCircle2,
 } from "lucide-react";
 import { AnnotationToolbar, type Tool, type Classification } from "@/components/annotation-toolbar";
 import { GuidedTour } from "@/components/guided-tour";
 import {
   INTRO_TOUR_STEPS,
-  REPORT_TOUR_STEPS,
   getQuestionTourSteps,
 } from "@/lib/guided-tour-steps";
 import { useIsMobile, usePrefersMobileFloorPlan } from "@/hooks/use-mobile";
@@ -53,6 +53,7 @@ import {
 import {
   loadSurveyDraft,
   saveSurveyDraft,
+  clearSurveyDraft,
   type SurveyStep,
 } from "@/lib/survey-draft";
 import {
@@ -60,6 +61,7 @@ import {
   type FloorPlanManifestRow,
   type ManifestSchoolOption,
 } from "@/lib/floor-plan-manifest";
+import type { SurveySubmissionPayload } from "@/lib/submit-survey";
 import Image from "next/image";
 
 type Step = SurveyStep;
@@ -118,9 +120,11 @@ export default function SurveyApp({
   const [runTour, setRunTour] = useState(false);
   const [tourIntroSeen, setTourIntroSeen] = useState(false);
   const [tourQuestionsSeen, setTourQuestionsSeen] = useState(false);
-  const [tourReportSeen, setTourReportSeen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
   // On phones, keep map/plan collapsed until the user opens it so WebGL/SVG
   // don't load while they are still answering the first question.
   const [mobileViewerOpen, setMobileViewerOpen] = useState(false);
@@ -162,9 +166,13 @@ export default function SurveyApp({
         responses: mergeSurveyResponses(draft.surveyData.responses),
         svgContent: prev.svgContent,
       }));
-      if (draft.step === "questions" || draft.step === "report") {
+      if (draft.step === "questions" || draft.step === "done") {
         setTourIntroSeen(true);
-        setTourQuestionsSeen(draft.step === "report");
+        setTourQuestionsSeen(draft.step === "done");
+      }
+      if (draft.step === "done") {
+        // Incomplete "done" drafts shouldn't lock users out; resume at last question.
+        setStep("questions");
       }
     }
     setDraftReady(true);
@@ -172,7 +180,7 @@ export default function SurveyApp({
 
   // Persist draft (without the large SVG) so a phone reload can resume.
   useEffect(() => {
-    if (!draftReady) return;
+    if (!draftReady || step === "done") return;
     const timer = window.setTimeout(() => {
       saveSurveyDraft({
         step,
@@ -432,7 +440,7 @@ export default function SurveyApp({
   const progressPercent =
     step === "intro"
       ? 0
-      : step === "report"
+      : step === "done"
       ? 100
       : ((currentPanelIndex + 1) / panels.length) * 100;
 
@@ -474,21 +482,13 @@ export default function SurveyApp({
     }));
   };
 
-  const handleViewReport = () => {
-    setStep("report");
-  };
-
   const questionTourSteps = useMemo(
     () => getQuestionTourSteps(availableFloors.length),
     [availableFloors.length]
   );
 
   const activeTourSteps =
-    step === "intro"
-      ? INTRO_TOUR_STEPS
-      : step === "questions"
-        ? questionTourSteps
-        : REPORT_TOUR_STEPS;
+    step === "intro" ? INTRO_TOUR_STEPS : questionTourSteps;
 
   useEffect(() => {
     if (!hasSeenWelcome()) setShowWelcome(true);
@@ -507,7 +507,6 @@ export default function SurveyApp({
     if (!isMobile) return;
     setTourIntroSeen(true);
     setTourQuestionsSeen(true);
-    setTourReportSeen(true);
     setRunTour(false);
   }, [isMobile]);
 
@@ -528,13 +527,46 @@ export default function SurveyApp({
     return () => window.clearTimeout(timer);
   }, [step, tourQuestionsSeen, isMobile, draftReady]);
 
-  useEffect(() => {
-    if (isMobile || !draftReady) return;
-    if (step !== "report" || tourReportSeen) return;
-    setTourReportSeen(true);
-    const timer = window.setTimeout(() => setRunTour(true), 450);
-    return () => window.clearTimeout(timer);
-  }, [step, tourReportSeen, isMobile, draftReady]);
+  const handleSubmitSurvey = async () => {
+    if (isSubmitting || submissionId) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    const { svgContent: _svgContent, ...payload } = surveyData;
+    const body: SurveySubmissionPayload = payload;
+
+    try {
+      const response = await fetch("/api/submissions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const result = (await response.json()) as {
+        submissionId?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "Failed to submit survey.");
+      }
+
+      if (!result.submissionId) {
+        throw new Error("Submission saved but no confirmation id was returned.");
+      }
+
+      setSubmissionId(result.submissionId);
+      clearSurveyDraft();
+      setStep("done");
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Failed to submit survey."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleNext = () => {
     if (step === "intro") {
@@ -544,7 +576,7 @@ export default function SurveyApp({
       if (currentPanelIndex < panels.length - 1) {
         setCurrentPanelIndex((prev) => prev + 1);
       } else {
-        setStep("report");
+        void handleSubmitSurvey();
       }
     }
   };
@@ -556,9 +588,6 @@ export default function SurveyApp({
       } else {
         setStep("intro");
       }
-    } else if (step === "report") {
-      setStep("questions");
-      setCurrentPanelIndex(panels.length - 1);
     }
   };
 
@@ -581,8 +610,7 @@ export default function SurveyApp({
 
   const isLastPanel =
     step === "questions" && currentPanelIndex === panels.length - 1;
-  const primaryActionDisabled =
-    isLastPanel ? false : !canProceed();
+  const primaryActionDisabled = !canProceed() || isSubmitting;
 
   const viewerSubtitle =
     isSpacesQuestion
@@ -792,50 +820,27 @@ export default function SurveyApp({
     );
   };
 
-  if (step === "report") {
+  if (step === "done") {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="border-b border-border/60 bg-card/80 backdrop-blur-sm sticky top-0 z-10">
-          <div className="flex w-full items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-4">
-              <Image
-                src="/images/aisd-logo.jpg"
-                alt="Austin Independent School District"
-                width={48}
-                height={48}
-                className="h-10 w-auto object-contain"
-              />
-              <div className="h-8 w-px bg-border/60" />
-              <h1 className="font-heading text-xl font-semibold text-foreground">Assessment Report</h1>
-              <div className="h-8 w-px bg-border/60" />
-              <Button variant="outline" onClick={handleBack} className="gap-2">
-                <ChevronLeft className="h-4 w-4" />
-                Back to Survey
-              </Button>
-              <Button variant="outline" onClick={() => window.print()} className="gap-2">
-                <FileText className="h-4 w-4" />
-                Print Report
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setRunTour(true)}
-              className="gap-1.5"
-            >
-              <HelpCircle className="h-4 w-4" />
-              Tour
-            </Button>
-          </div>
+      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
+          <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-600" />
+          <h1 className="font-heading text-2xl font-semibold text-foreground">
+            Thank you
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Your Educational Suitability and Facility Condition Survey has been
+            submitted successfully.
+          </p>
+          {submissionId && (
+            <p className="mt-4 text-xs text-muted-foreground">
+              Reference:{" "}
+              <span className="font-mono text-foreground">{submissionId}</span>
+            </p>
+          )}
+          <SurveyCredit />
         </div>
-        <ReportView data={surveyData} />
         <WelcomeDialog open={showWelcome} onClose={handleWelcomeClose} />
-        <GuidedTour
-          key="report"
-          steps={REPORT_TOUR_STEPS}
-          run={runTour}
-          onClose={() => setRunTour(false)}
-        />
       </div>
     );
   }
@@ -876,18 +881,8 @@ export default function SurveyApp({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleViewReport}
-                  data-tour="preview-report"
-                  className="hidden h-6 gap-0.5 text-[11px] sm:ml-2 sm:flex"
-                >
-                  <FileText className="h-3 w-3" />
-                  Preview Report
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
                   onClick={() => setRunTour(true)}
-                  className="hidden h-6 gap-0.5 text-[11px] sm:flex"
+                  className="hidden h-6 gap-0.5 text-[11px] sm:ml-2 sm:flex"
                 >
                   <HelpCircle className="h-3 w-3" />
                   Tour
@@ -1188,36 +1183,44 @@ export default function SurveyApp({
 
           {/* Navigation Buttons */}
           <div className="shrink-0 border-t border-border/60 bg-card p-2" data-tour="survey-navigation">
-            <div className="flex justify-between gap-1.5">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleBack}
-                disabled={step === "intro"}
-                className="h-7 text-xs"
-              >
-                <ChevronLeft className="mr-0.5 h-3 w-3" />
-                Back
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleNext}
-                disabled={primaryActionDisabled}
-                className="h-7 text-xs"
-              >
-                {step === "questions" &&
-                currentPanelIndex === panels.length - 1 ? (
-                  <>
-                    View Report
-                    <FileText className="ml-0.5 h-3 w-3" />
-                  </>
-                ) : (
-                  <>
-                    Next
-                    <ChevronRight className="ml-0.5 h-3 w-3" />
-                  </>
-                )}
-              </Button>
+            <div className="flex flex-col gap-1.5">
+              {submitError && (
+                <p className="text-center text-[11px] text-destructive">{submitError}</p>
+              )}
+              <div className="flex justify-between gap-1.5">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBack}
+                  disabled={step === "intro" || isSubmitting}
+                  className="h-7 text-xs"
+                >
+                  <ChevronLeft className="mr-0.5 h-3 w-3" />
+                  Back
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleNext}
+                  disabled={primaryActionDisabled}
+                  className="h-7 text-xs"
+                >
+                  {isLastPanel ? (
+                    <>
+                      {isSubmitting ? (
+                        <Loader2 className="mr-0.5 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Send className="mr-0.5 h-3 w-3" />
+                      )}
+                      {isSubmitting ? "Submitting…" : "Submit"}
+                    </>
+                  ) : (
+                    <>
+                      Next
+                      <ChevronRight className="ml-0.5 h-3 w-3" />
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>

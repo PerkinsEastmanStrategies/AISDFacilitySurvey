@@ -10,7 +10,18 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Layers, MapPin, X } from "lucide-react";
-import { annotationMatchesQuestionFilter, type Annotation } from "@/lib/survey-data";
+import {
+  annotationMatchesQuestionFilter,
+  SURVEY_QUESTIONS,
+  type Annotation,
+} from "@/lib/survey-data";
+
+function questionCategoryLabel(questionId: number): string {
+  return (
+    SURVEY_QUESTIONS.find((q) => q.id === questionId)?.category ??
+    `Question ${questionId}`
+  );
+}
 import type { Tool, Classification } from "@/components/annotation-toolbar";
 
 interface MapViewerProps {
@@ -685,16 +696,10 @@ export function MapViewer({
           <PopoverContent className="w-72 p-0">
             <div className="p-4">
               <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white ${
-                      selectedAnnotation.classification === "strength"
-                        ? "bg-emerald-600"
-                        : "bg-rose-600"
-                    }`}
-                  >
-                    {selectedAnnotation.questionId}
-                  </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {questionCategoryLabel(selectedAnnotation.questionId)}
+                  </p>
                   <span
                     className={`text-sm font-medium ${
                       selectedAnnotation.classification === "strength"
@@ -710,7 +715,7 @@ export function MapViewer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 shrink-0 p-0"
                   onClick={() => setSelectedAnnotation(null)}
                 >
                   <X className="h-3 w-3" />

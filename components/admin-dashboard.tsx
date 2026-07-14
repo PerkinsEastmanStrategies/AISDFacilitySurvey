@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AdminComparisonCharts } from "@/components/admin-comparison-charts";
+import { AdminMeetingNotes } from "@/components/admin-meeting-notes";
 import { ReportView } from "@/components/report-view";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ import {
   Lock,
   RefreshCw,
   Search,
+  StickyNote,
 } from "lucide-react";
 
 type AdminView = "matrix" | "detail";
@@ -99,6 +101,7 @@ export function AdminDashboard() {
   const [listLoading, setListLoading] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notesOpen, setNotesOpen] = useState(true);
 
   useEffect(() => {
     const stored = sessionStorage.getItem(ADMIN_KEY_STORAGE);
@@ -481,6 +484,17 @@ export function AdminDashboard() {
                 All schools
               </Button>
             )}
+            {!notesOpen && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setNotesOpen(true)}
+                className="gap-1.5"
+              >
+                <StickyNote className="h-4 w-4" />
+                Notes
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -754,6 +768,12 @@ export function AdminDashboard() {
           )}
         </>
       )}
+
+      <AdminMeetingNotes
+        school={selectedSchool}
+        open={notesOpen}
+        onOpenChange={setNotesOpen}
+      />
     </div>
   );
 }

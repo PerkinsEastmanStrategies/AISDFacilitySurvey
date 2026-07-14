@@ -19,7 +19,18 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
-import { annotationMatchesQuestionFilter, type Annotation } from "@/lib/survey-data";
+import {
+  annotationMatchesQuestionFilter,
+  SURVEY_QUESTIONS,
+  type Annotation,
+} from "@/lib/survey-data";
+
+function questionCategoryLabel(questionId: number): string {
+  return (
+    SURVEY_QUESTIONS.find((q) => q.id === questionId)?.category ??
+    `Question ${questionId}`
+  );
+}
 import { clientToSvgPoint, findRoomMatchAtSvgPoint, formatRoomLocationDisplay, logCafmFloorPlanAudit, logRoomsWithinFloorPlanShape, type FloorPlanSelectionShape, type RoomInfo } from "@/lib/spaces-data";
 import {
   applySvgViewBox,
@@ -703,17 +714,15 @@ export function FloorPlanViewer({
           <PopoverContent className="w-72 p-0" side="top" sideOffset={8}>
             <div className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white ${isStrength ? "bg-emerald-600" : "bg-rose-600"}`}
-                  >
-                    {annotation.questionId}
-                  </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {questionCategoryLabel(annotation.questionId)}
+                  </p>
                   <span className={`text-sm font-medium ${isStrength ? "text-emerald-700" : "text-rose-700"}`}>
                     {isStrength ? "Strength" : "Challenge"}
                   </span>
                 </div>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSelectedAnnotation(null)}>
+                <Button variant="ghost" size="sm" className="h-6 w-6 shrink-0 p-0" onClick={() => setSelectedAnnotation(null)}>
                   <X className="h-3 w-3" />
                 </Button>
               </div>
@@ -786,17 +795,15 @@ export function FloorPlanViewer({
           <PopoverContent className="w-72 p-0" side="top" sideOffset={8}>
             <div className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white ${isStrength ? "bg-emerald-600" : "bg-rose-600"}`}
-                  >
-                    {annotation.questionId}
-                  </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {questionCategoryLabel(annotation.questionId)}
+                  </p>
                   <span className={`text-sm font-medium ${isStrength ? "text-emerald-700" : "text-rose-700"}`}>
                     {isStrength ? "Strength" : "Challenge"}
                   </span>
                 </div>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSelectedAnnotation(null)}>
+                <Button variant="ghost" size="sm" className="h-6 w-6 shrink-0 p-0" onClick={() => setSelectedAnnotation(null)}>
                   <X className="h-3 w-3" />
                 </Button>
               </div>
@@ -875,17 +882,15 @@ export function FloorPlanViewer({
           <PopoverContent className="w-72 p-0" side="top" sideOffset={8}>
             <div className="p-4">
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white ${isStrength ? "bg-emerald-600" : "bg-rose-600"}`}
-                  >
-                    {annotation.questionId}
-                  </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {questionCategoryLabel(annotation.questionId)}
+                  </p>
                   <span className={`text-sm font-medium ${isStrength ? "text-emerald-700" : "text-rose-700"}`}>
                     {isStrength ? "Strength" : "Challenge"}
                   </span>
                 </div>
-                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setSelectedAnnotation(null)}>
+                <Button variant="ghost" size="sm" className="h-6 w-6 shrink-0 p-0" onClick={() => setSelectedAnnotation(null)}>
                   <X className="h-3 w-3" />
                 </Button>
               </div>

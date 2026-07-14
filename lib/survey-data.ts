@@ -129,19 +129,19 @@ export const SURVEY_QUESTIONS = [
   },
   {
     id: 17,
-    text: "Looking ahead over the next 5 years, please rank your top 5 large-scale facility modernization projects in order of priority.",
-    category: "Campus Improvement Priorities",
-    section: "Educational Suitability",
-    type: "ranking",
-    color: "hsl(220, 15%, 40%)",
-  },
-  {
-    id: 18,
     text: "What are your top 3 safety and security priorities for this campus?",
     category: "Safety and Security Priorities",
     section: "Educational Suitability",
     type: "text",
     color: "hsl(0, 70%, 45%)",
+  },
+  {
+    id: 18,
+    text: "Looking ahead over the next 5 years, please rank your top 5 large-scale facility modernization projects in order of priority.",
+    category: "Campus Improvement Priorities",
+    section: "Educational Suitability",
+    type: "ranking",
+    color: "hsl(220, 15%, 40%)",
   },
   // Facility Condition Assessment (FCA) — positive Likert statements
   {
@@ -628,7 +628,7 @@ export function formatRatingDisplay(
 }
 
 /**
- * Categories respondents rank in Campus Improvement Priorities (Q17).
+ * Categories respondents rank in Campus Improvement Priorities (Q18).
  * Likert categories #1–15 only — excludes Overall Educational Suitability.
  */
 export const PRIORITIZATION_CATEGORIES: string[] = SURVEY_QUESTIONS.filter(

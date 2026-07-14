@@ -83,30 +83,18 @@ export const QUESTION_TOUR_STEPS: TourStep[] = [
     placement: "left",
   },
   {
-    target: "preview-report",
-    title: "Preview your report",
-    body: "At any time, open Preview Report to review your scores, annotations, and school info before finishing.",
-    placement: "bottom",
+    target: "survey-navigation",
+    title: "Move through the survey",
+    body: "Use Back and Next to move between steps. On the last question, Next becomes Submit Survey to finish.",
+    placement: "top",
   },
 ];
 
-export const REPORT_TOUR_STEPS: TourStep[] = [
-  {
-    target: "report-tabs",
-    title: "Explore your report",
-    body: "Use the tabs to review the Executive Summary, Detailed Ratings, interactive Floor Plan, Site Map, and School Info — the same views you saw while completing the survey.",
-    placement: "bottom",
-  },
-  {
-    target: "submit-survey",
-    title: "Submit when ready",
-    body: "When you have reviewed everything, click Submit Survey to save your assessment. Your responses, ratings, and annotations are stored for the district planning team.",
-    placement: "left",
-  },
-];
+export const DONE_TOUR_STEPS: TourStep[] = [];
 
 export function getQuestionTourSteps(floorCount: number): TourStep[] {
   return QUESTION_TOUR_STEPS.filter(
-    (step) => step.target !== "floor-toggle" || floorCount > 1
-  );
+    (step) =>
+      step.target !== "floor-toggle" || floorCount > 1
+  ).filter((step) => step.target !== "preview-report");
 }

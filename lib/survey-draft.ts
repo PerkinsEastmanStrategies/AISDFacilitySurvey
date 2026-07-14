@@ -2,7 +2,7 @@ import type { SurveyData } from "@/lib/survey-data";
 
 const STORAGE_KEY = "aisd-survey-draft-v1";
 
-export type SurveyStep = "intro" | "questions" | "report";
+export type SurveyStep = "intro" | "questions" | "done";
 
 export interface SurveyDraft {
   version: 1;
@@ -23,9 +23,16 @@ export function loadSurveyDraft(): SurveyDraft | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as SurveyDraft;
+    const parsed = JSON.parse(raw) as SurveyDraft & { step?: string };
     if (parsed?.version !== 1 || !parsed.surveyData) return null;
-    return parsed;
+    // Migrate older drafts that used the pre-submit report step.
+    if (parsed.step === "report") {
+      parsed.step = "questions";
+    }
+    if (parsed.step !== "intro" && parsed.step !== "questions" && parsed.step !== "done") {
+      return null;
+    }
+    return parsed as SurveyDraft;
   } catch {
     return null;
   }
