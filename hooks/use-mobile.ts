@@ -22,9 +22,9 @@ export function useIsMobile(): boolean {
 }
 
 /**
- * Prefer lightweight `*.mobile.svg` floor plans on phones and tablets.
- * `ready` is false until the media query has been evaluated (avoids briefly
- * fetching the desktop SVG on a phone before the breakpoint is known).
+ * Prefer lightweight `*.mobile.svg` floor plans on narrow viewports only.
+ * Do not key off `pointer: coarse` — touchscreen laptops would otherwise load
+ * incomplete mobile exports (labels without walls) on large screens.
  */
 export function usePrefersMobileFloorPlan(): {
   ready: boolean;
@@ -33,9 +33,7 @@ export function usePrefersMobileFloorPlan(): {
   const [state, setState] = useState({ ready: false, preferMobile: false });
 
   useEffect(() => {
-    const mediaQuery = window.matchMedia(
-      "(max-width: 1023px), (pointer: coarse)"
-    );
+    const mediaQuery = window.matchMedia("(max-width: 1023px)");
     const update = () =>
       setState({ ready: true, preferMobile: mediaQuery.matches });
     update();

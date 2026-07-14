@@ -64,7 +64,22 @@ export function getSupabaseFloorPlanUrl(buildingName: string): string | null {
 const svgCache = new Map<string, string>();
 const svgInflight = new Map<string, Promise<string | null>>();
 /** Bump when floor-plan fetch rules change so stale Cache API entries are ignored. */
-const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v2";
+const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v3";
+
+/**
+ * True when an SVG includes architectural (or room-boundary) geometry — not
+ * just floating CAFM labels. Used to reject incomplete `*.mobile.svg` exports
+ * that would otherwise show room names with no walls.
+ */
+export function svgHasFloorPlanGeometry(svg: string): boolean {
+  if (!svg) return false;
+  if (/id\s*=\s*["']A-WALLS["']/i.test(svg)) return true;
+  if (/id\s*=\s*["']CAFM_BLDG_OTLN["']/i.test(svg)) return true;
+  if (/id\s*=\s*["']CAFM_SPACE["']/i.test(svg)) return true;
+  if (/id\s*=\s*["']planWalls["']/i.test(svg)) return true;
+  if (/id\s*=\s*["']planDetail["']/i.test(svg)) return true;
+  return false;
+}
 
 async function openFloorPlanCache(): Promise<Cache | null> {
   if (typeof window === "undefined" || !("caches" in window)) return null;
@@ -144,24 +159,45 @@ export async function fetchFloorPlanSvgByFilename(
     ? [toMobileFloorPlanFilename(filename), filename]
     : [filename];
   const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
+  const preferMobile = Boolean(options?.preferMobile);
 
-  for (const candidate of uniqueCandidates) {
+  for (let i = 0; i < uniqueCandidates.length; i += 1) {
+    const candidate = uniqueCandidates[i];
     const cached = svgCache.get(candidate);
-    if (cached) return cached;
+    let svg = cached ?? null;
 
-    let inflight = svgInflight.get(candidate);
-    if (!inflight) {
-      inflight = fetchFloorPlanSvgFromSources(candidate).finally(() => {
-        svgInflight.delete(candidate);
-      });
-      svgInflight.set(candidate, inflight);
+    if (!svg) {
+      let inflight = svgInflight.get(candidate);
+      if (!inflight) {
+        inflight = fetchFloorPlanSvgFromSources(candidate).finally(() => {
+          svgInflight.delete(candidate);
+        });
+        svgInflight.set(candidate, inflight);
+      }
+      svg = await inflight;
+      if (svg) {
+        svgCache.set(candidate, svg);
+      }
     }
 
-    const svg = await inflight;
-    if (svg) {
-      svgCache.set(candidate, svg);
-      return svg;
+    if (!svg) continue;
+
+    // Mobile exports are sometimes labels-only (CAFM_ID, no walls). Skip them
+    // when a fuller candidate remains (usually the desktop SVG).
+    const isMobileCandidate = /\.mobile\.svg$/i.test(candidate);
+    const hasLaterFullCandidate =
+      preferMobile &&
+      isMobileCandidate &&
+      uniqueCandidates.slice(i + 1).some((name) => !/\.mobile\.svg$/i.test(name));
+
+    if (
+      hasLaterFullCandidate &&
+      !svgHasFloorPlanGeometry(svg)
+    ) {
+      continue;
     }
+
+    return svg;
   }
 
   return fallbackSvg ?? null;
