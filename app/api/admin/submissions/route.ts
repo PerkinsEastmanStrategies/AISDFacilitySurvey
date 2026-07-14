@@ -3,7 +3,10 @@ import {
   unauthorizedAdminResponse,
   verifyAdminRequest,
 } from "@/lib/admin-auth";
+import { buildSchoolMatrix } from "@/lib/admin-school-matrix";
 import { listSurveySubmissions } from "@/lib/load-submission";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   if (!verifyAdminRequest(request)) {
@@ -12,7 +15,13 @@ export async function GET(request: Request) {
 
   try {
     const submissions = await listSurveySubmissions();
-    return NextResponse.json({ submissions });
+    const { rows: schoolMatrix, source: manifestSource } =
+      await buildSchoolMatrix(submissions);
+    return NextResponse.json({
+      submissions,
+      schoolMatrix,
+      manifestSource,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to load submissions.";

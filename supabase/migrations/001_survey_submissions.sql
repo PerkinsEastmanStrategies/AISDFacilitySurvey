@@ -75,15 +75,18 @@ comment on column survey_submissions.report_html is
   'Optional static HTML snapshot at submit time. Not the source of truth.';
 
 -- ---------------------------------------------------------------------------
--- Question answers (Q1–53 ratings, text, ranking)
+-- Question answers (ESA + FCA ratings, text, ranking)
+-- question_id upper bound is intentionally loose (1–200) so new survey
+-- questions can ship without a DB migration each time.
 -- ---------------------------------------------------------------------------
 create table question_responses (
   id uuid primary key default gen_random_uuid(),
   submission_id uuid not null references survey_submissions (id) on delete cascade,
 
-  question_id smallint not null check (question_id between 1 and 53),
+  question_id smallint not null check (question_id between 1 and 200),
 
-  -- rating: 1–5 for scored questions; 0 = unanswered/text-only; -1 = FCA "I don't know"
+  -- rating: 1–5 scored; 0 = unanswered/text-only;
+  --         -1 = FCA "I don't know"; -2 = FCA "N/A" (both excluded from scoring)
   rating smallint not null default 0,
 
   explanation text not null default '',
@@ -109,7 +112,7 @@ create table annotations (
   -- Client-generated id preserved for traceability (annotation-1730...-abc)
   client_id text,
 
-  question_id smallint not null check (question_id between 1 and 53),
+  question_id smallint not null check (question_id between 1 and 200),
 
   type annotation_type not null,
   view annotation_view not null default 'floorplan',
