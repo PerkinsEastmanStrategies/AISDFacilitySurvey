@@ -1189,7 +1189,7 @@ export function FloorPlanViewer({
               value={pendingComment}
               onChange={(e) => setPendingComment(e.target.value)}
               placeholder="Optional: Describe this location..."
-              className="w-full rounded-lg border border-border bg-background p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              className="w-full rounded-lg border border-border bg-muted/45 p-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
               rows={3}
               autoFocus
             />
