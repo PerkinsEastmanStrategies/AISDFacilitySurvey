@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback, useLayoutEffect } from "react";
+import { useState, useMemo, useEffect, useCallback, useLayoutEffect, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +94,28 @@ function SurveyCredit() {
       <span className="font-medium text-foreground">AECOM</span>, and{" "}
       <span className="font-medium text-foreground">Cushing Terrell</span>.
     </p>
+  );
+}
+
+function StepSection({
+  letter,
+  title,
+  children,
+}: {
+  letter: "A" | "B" | "C";
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-1.5" aria-label={`Step ${letter}: ${title}`}>
+      <div className="flex items-center gap-1.5">
+        <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-foreground">
+          {letter}
+        </span>
+        <p className="text-[11px] font-semibold text-foreground">{title}</p>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -1079,7 +1101,7 @@ export default function SurveyApp({
                   ) : (
                     <>
                       {currentPanel.kind === "category" ? (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {/* Category header (shown once for the whole panel) */}
                           <div className="space-y-0.5">
                             <Badge
@@ -1097,56 +1119,70 @@ export default function SurveyApp({
                                 : "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree)."}
                             </p>
                           </div>
-                          {currentPanel.questions.map((q) => {
-                            const response =
-                              surveyData.responses.find(
-                                (r) => r.questionId === q.id
-                              ) ?? {
-                                questionId: q.id,
-                                rating: 0,
-                                explanation: "",
-                              };
-                            return (
-                              <QuestionForm
-                                key={`rating-${q.id}`}
-                                questionId={q.id}
-                                response={response}
-                                onChange={handleResponseChange}
-                                compact
-                                parts="prompt-rating"
+                          <StepSection letter="A" title="Rate the statements">
+                            <div className="space-y-2">
+                              {currentPanel.questions.map((q) => {
+                                const response =
+                                  surveyData.responses.find(
+                                    (r) => r.questionId === q.id
+                                  ) ?? {
+                                    questionId: q.id,
+                                    rating: 0,
+                                    explanation: "",
+                                  };
+                                return (
+                                  <QuestionForm
+                                    key={`rating-${q.id}`}
+                                    questionId={q.id}
+                                    response={response}
+                                    onChange={handleResponseChange}
+                                    compact
+                                    parts="prompt-rating"
+                                  />
+                                );
+                              })}
+                            </div>
+                          </StepSection>
+                          <StepSection
+                            letter="B"
+                            title="Mark locations on the floor plan or site map"
+                          >
+                            <div data-tour="annotation-toolbar">
+                              <AnnotationToolbar
+                                tool={annotationTool}
+                                classification={annotationClassification}
+                                currentColor={currentPanel.color}
+                                onToolChange={setAnnotationTool}
+                                onClassificationChange={setAnnotationClassification}
+                                disabled={!surveyData.svgContent}
+                                showHeading={false}
                               />
-                            );
-                          })}
-                          <div data-tour="annotation-toolbar">
-                            <AnnotationToolbar
-                              tool={annotationTool}
-                              classification={annotationClassification}
-                              currentColor={currentPanel.color}
-                              onToolChange={setAnnotationTool}
-                              onClassificationChange={setAnnotationClassification}
-                              disabled={!surveyData.svgContent}
-                            />
-                          </div>
-                          {currentPanel.questions.map((q) => {
-                            const response =
-                              surveyData.responses.find(
-                                (r) => r.questionId === q.id
-                              ) ?? {
-                                questionId: q.id,
-                                rating: 0,
-                                explanation: "",
-                              };
-                            return (
-                              <QuestionForm
-                                key={`explain-${q.id}`}
-                                questionId={q.id}
-                                response={response}
-                                onChange={handleResponseChange}
-                                compact
-                                parts="explanation"
-                              />
-                            );
-                          })}
+                            </div>
+                          </StepSection>
+                          <StepSection letter="C" title="Explain your ratings">
+                            <div className="space-y-2">
+                              {currentPanel.questions.map((q) => {
+                                const response =
+                                  surveyData.responses.find(
+                                    (r) => r.questionId === q.id
+                                  ) ?? {
+                                    questionId: q.id,
+                                    rating: 0,
+                                    explanation: "",
+                                  };
+                                return (
+                                  <QuestionForm
+                                    key={`explain-${q.id}`}
+                                    questionId={q.id}
+                                    response={response}
+                                    onChange={handleResponseChange}
+                                    compact
+                                    parts="explanation"
+                                  />
+                                );
+                              })}
+                            </div>
+                          </StepSection>
                         </div>
                       ) : isRankingPanel || isTextPanel ? (
                         <QuestionForm
@@ -1155,29 +1191,39 @@ export default function SurveyApp({
                           onChange={handleResponseChange}
                         />
                       ) : (
-                        <div className="space-y-2">
-                          <QuestionForm
-                            questionId={currentQuestion.id}
-                            response={currentResponse}
-                            onChange={handleResponseChange}
-                            parts="prompt-rating"
-                          />
-                          <div data-tour="annotation-toolbar">
-                            <AnnotationToolbar
-                              tool={annotationTool}
-                              classification={annotationClassification}
-                              currentColor={currentPanel.color}
-                              onToolChange={setAnnotationTool}
-                              onClassificationChange={setAnnotationClassification}
-                              disabled={!surveyData.svgContent}
+                        <div className="space-y-3">
+                          <StepSection letter="A" title="Rate this statement">
+                            <QuestionForm
+                              questionId={currentQuestion.id}
+                              response={currentResponse}
+                              onChange={handleResponseChange}
+                              parts="prompt-rating"
                             />
-                          </div>
-                          <QuestionForm
-                            questionId={currentQuestion.id}
-                            response={currentResponse}
-                            onChange={handleResponseChange}
-                            parts="explanation"
-                          />
+                          </StepSection>
+                          <StepSection
+                            letter="B"
+                            title="Mark locations on the floor plan or site map"
+                          >
+                            <div data-tour="annotation-toolbar">
+                              <AnnotationToolbar
+                                tool={annotationTool}
+                                classification={annotationClassification}
+                                currentColor={currentPanel.color}
+                                onToolChange={setAnnotationTool}
+                                onClassificationChange={setAnnotationClassification}
+                                disabled={!surveyData.svgContent}
+                                showHeading={false}
+                              />
+                            </div>
+                          </StepSection>
+                          <StepSection letter="C" title="Explain your rating">
+                            <QuestionForm
+                              questionId={currentQuestion.id}
+                              response={currentResponse}
+                              onChange={handleResponseChange}
+                              parts="explanation"
+                            />
+                          </StepSection>
                         </div>
                       )}
 

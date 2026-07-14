@@ -20,6 +20,8 @@ interface AnnotationToolbarProps {
   onToolChange: (tool: Tool) => void;
   onClassificationChange: (classification: Classification) => void;
   disabled?: boolean;
+  /** When false, omit the built-in heading (parent provides step label). */
+  showHeading?: boolean;
 }
 
 export function AnnotationToolbar({
@@ -29,6 +31,7 @@ export function AnnotationToolbar({
   onToolChange,
   onClassificationChange,
   disabled = false,
+  showHeading = true,
 }: AnnotationToolbarProps) {
   return (
     <div className={cn(
@@ -36,14 +39,22 @@ export function AnnotationToolbar({
       disabled && "opacity-50 pointer-events-none"
     )}>
       <div className="space-y-2">
-        <div>
-          <p className="mb-px text-[11px] font-medium text-foreground">
-            Mark Locations on Floor Plan
+        {showHeading && (
+          <div>
+            <p className="mb-px text-[11px] font-medium text-foreground">
+              Mark Locations on Floor Plan
+            </p>
+            <p className="mb-1 text-[9px] leading-snug text-muted-foreground">
+              Identify specific areas that are positive strengths or areas of concern related to this question.
+            </p>
+          </div>
+        )}
+        {!showHeading && (
+          <p className="text-[9px] leading-snug text-muted-foreground">
+            Identify specific areas that are positive strengths or areas of
+            concern related to this question.
           </p>
-          <p className="mb-1 text-[9px] leading-snug text-muted-foreground">
-            Identify specific areas that are positive strengths or areas of concern related to this question.
-          </p>
-        </div>
+        )}
 
         <div>
           <p className="mb-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
