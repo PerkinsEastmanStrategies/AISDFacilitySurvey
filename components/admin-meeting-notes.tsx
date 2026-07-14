@@ -23,7 +23,7 @@ import {
 
 const NOTES_DATA_PREFIX = "aisd-admin-meeting-notes:v2:";
 const NOTES_DATA_PREFIX_V1 = "aisd-admin-meeting-notes:v1:";
-const NOTES_UI_KEY = "aisd-admin-meeting-notes-ui:v4";
+const NOTES_UI_KEY = "aisd-admin-meeting-notes-ui:v5";
 
 const DEFAULT_WIDTH = 420;
 const DEFAULT_HEIGHT = 440;
@@ -33,12 +33,9 @@ const MINIMIZED_HEIGHT = 44;
 const EDGE_PAD = 12;
 
 type PanelUiState = {
-  x: number;
-  y: number;
   width: number;
   height: number;
   minimized: boolean;
-  open: boolean;
 };
 
 type MeetingNoteRecord = {
@@ -137,14 +134,10 @@ function defaultPosition(width: number, height: number): { x: number; y: number 
 }
 
 function loadUiState(): PanelUiState {
-  const width = DEFAULT_WIDTH;
-  const height = DEFAULT_HEIGHT;
   const fallback: PanelUiState = {
-    ...defaultPosition(width, height),
-    width,
-    height,
+    width: DEFAULT_WIDTH,
+    height: DEFAULT_HEIGHT,
     minimized: false,
-    open: false,
   };
   if (typeof window === "undefined") return fallback;
   try {
@@ -152,8 +145,6 @@ function loadUiState(): PanelUiState {
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<PanelUiState>;
     return {
-      x: typeof parsed.x === "number" ? parsed.x : fallback.x,
-      y: typeof parsed.y === "number" ? parsed.y : fallback.y,
       width:
         typeof parsed.width === "number" && parsed.width >= MIN_WIDTH
           ? parsed.width
@@ -163,8 +154,6 @@ function loadUiState(): PanelUiState {
           ? parsed.height
           : fallback.height,
       minimized: Boolean(parsed.minimized),
-      // Always start closed — open from the header Notes button
-      open: false,
     };
   } catch {
     return fallback;
@@ -260,23 +249,34 @@ export function AdminMeetingNotes({
   useEffect(() => {
     if (!school.trim()) return;
     const ui = loadUiState();
-    const clamped = clampPanel(
-      ui.x,
-      ui.y,
+    const sizeClamped = clampPanel(
+      EDGE_PAD,
+      EDGE_PAD,
       ui.width,
       ui.height,
-      ui.minimized
+      false
     );
-    setPosition({ x: clamped.x, y: clamped.y });
-    setSize({ width: clamped.width, height: clamped.height });
-    expandedHeightRef.current = Math.max(MIN_HEIGHT, ui.height);
-    setMinimized(ui.minimized);
+    setSize({ width: sizeClamped.width, height: sizeClamped.height });
+    expandedHeightRef.current = Math.max(MIN_HEIGHT, sizeClamped.height);
+    setMinimized(false);
     setRecord(loadNoteRecord(school));
     schoolRef.current = school;
     onOpenChange(false);
     setHydrated(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate on mount only
   }, []);
+
+  // Always place mid-right when the panel opens (ignore any old saved coords).
+  useEffect(() => {
+    if (!hydrated || !open) return;
+    const width = sizeRef.current.width;
+    const height = Math.max(MIN_HEIGHT, sizeRef.current.height);
+    const mid = defaultPosition(width, height);
+    const placed = clampPanel(mid.x, mid.y, width, height, false);
+    setMinimized(false);
+    setSize({ width: placed.width, height: placed.height });
+    setPosition({ x: placed.x, y: placed.y });
+  }, [open, hydrated]);
 
   useEffect(() => {
     if (!hydrated || !school.trim()) return;
@@ -294,14 +294,11 @@ export function AdminMeetingNotes({
     if (!hydrated || !school.trim()) return;
     try {
       const next: PanelUiState = {
-        x: position.x,
-        y: position.y,
         width: size.width,
         height: minimized
           ? expandedHeightRef.current
           : Math.max(MIN_HEIGHT, size.height),
         minimized,
-        open,
       };
       if (!minimized) {
         expandedHeightRef.current = next.height;
@@ -310,7 +307,7 @@ export function AdminMeetingNotes({
     } catch {
       // ignore
     }
-  }, [position, size, minimized, open, hydrated, school]);
+  }, [size, minimized, hydrated, school]);
 
   useEffect(() => {
     if (!hydrated || !school.trim()) return;
