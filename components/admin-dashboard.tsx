@@ -484,7 +484,7 @@ export function AdminDashboard() {
                 All schools
               </Button>
             )}
-            {!notesOpen && (
+            {!notesOpen && selectedSchool && view === "detail" && (
               <Button
                 variant="outline"
                 size="sm"
@@ -769,11 +769,13 @@ export function AdminDashboard() {
         </>
       )}
 
-      <AdminMeetingNotes
-        school={selectedSchool}
-        open={notesOpen}
-        onOpenChange={setNotesOpen}
-      />
+      {view === "detail" && selectedSchool ? (
+        <AdminMeetingNotes
+          school={selectedSchool}
+          open={notesOpen}
+          onOpenChange={setNotesOpen}
+        />
+      ) : null}
     </div>
   );
 }
