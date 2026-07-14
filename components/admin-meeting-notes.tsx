@@ -5,8 +5,10 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,20 +25,14 @@ import {
 
 const NOTES_DATA_PREFIX = "aisd-admin-meeting-notes:v2:";
 const NOTES_DATA_PREFIX_V1 = "aisd-admin-meeting-notes:v1:";
-const NOTES_UI_KEY = "aisd-admin-meeting-notes-ui:v5";
+const NOTES_SIZE_KEY = "aisd-admin-meeting-notes-size:v1";
 
 const DEFAULT_WIDTH = 420;
-const DEFAULT_HEIGHT = 440;
+const DEFAULT_HEIGHT = 460;
 const MIN_WIDTH = 300;
 const MIN_HEIGHT = 280;
 const MINIMIZED_HEIGHT = 44;
-const EDGE_PAD = 12;
-
-type PanelUiState = {
-  width: number;
-  height: number;
-  minimized: boolean;
-};
+const EDGE_PAD = 16;
 
 type MeetingNoteRecord = {
   assessors: string;
@@ -101,7 +97,6 @@ function loadNoteRecord(school: string): MeetingNoteRecord {
         body: typeof parsed.body === "string" ? parsed.body : "",
       };
     }
-    // Migrate plain-text v1 notes if present.
     const legacy = localStorage.getItem(
       `${NOTES_DATA_PREFIX_V1}${school.trim()}`
     );
@@ -118,77 +113,64 @@ function saveNoteRecord(school: string, record: MeetingNoteRecord) {
   try {
     localStorage.setItem(schoolNoteKey(school), JSON.stringify(record));
   } catch {
-    // ignore quota / private mode
+    // ignore
   }
 }
 
-function defaultPosition(width: number, height: number): { x: number; y: number } {
+function loadSavedSize(): { width: number; height: number } {
   if (typeof window === "undefined") {
-    return { x: EDGE_PAD, y: 120 };
+    return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
   }
-  return {
-    x: Math.max(EDGE_PAD, window.innerWidth - width - EDGE_PAD),
-    // Vertically centered on the right
-    y: Math.max(EDGE_PAD, Math.round((window.innerHeight - height) / 2)),
-  };
-}
-
-function loadUiState(): PanelUiState {
-  const fallback: PanelUiState = {
-    width: DEFAULT_WIDTH,
-    height: DEFAULT_HEIGHT,
-    minimized: false,
-  };
-  if (typeof window === "undefined") return fallback;
   try {
-    const raw = localStorage.getItem(NOTES_UI_KEY);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw) as Partial<PanelUiState>;
+    const raw = localStorage.getItem(NOTES_SIZE_KEY);
+    if (!raw) return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
+    const parsed = JSON.parse(raw) as { width?: number; height?: number };
     return {
       width:
         typeof parsed.width === "number" && parsed.width >= MIN_WIDTH
           ? parsed.width
-          : fallback.width,
+          : DEFAULT_WIDTH,
       height:
         typeof parsed.height === "number" && parsed.height >= MIN_HEIGHT
           ? parsed.height
-          : fallback.height,
-      minimized: Boolean(parsed.minimized),
+          : DEFAULT_HEIGHT,
     };
   } catch {
-    return fallback;
+    return { width: DEFAULT_WIDTH, height: DEFAULT_HEIGHT };
   }
 }
 
-function clampPanel(
+function clampSize(width: number, height: number) {
+  if (typeof window === "undefined") {
+    return { width, height };
+  }
+  return {
+    width: Math.min(
+      Math.max(MIN_WIDTH, width),
+      window.innerWidth - EDGE_PAD * 2
+    ),
+    height: Math.min(
+      Math.max(MIN_HEIGHT, height),
+      window.innerHeight - EDGE_PAD * 2
+    ),
+  };
+}
+
+function clampPoint(
   x: number,
   y: number,
   width: number,
-  height: number,
-  minimized: boolean
-): { x: number; y: number; width: number; height: number } {
-  if (typeof window === "undefined") {
-    return { x, y, width, height };
-  }
-  const maxW = Math.max(MIN_WIDTH, window.innerWidth - EDGE_PAD * 2);
-  const maxH = Math.max(
-    minimized ? MINIMIZED_HEIGHT : MIN_HEIGHT,
-    window.innerHeight - EDGE_PAD * 2
-  );
-  const nextWidth = Math.min(Math.max(MIN_WIDTH, width), maxW);
-  const nextHeight = minimized
-    ? MINIMIZED_HEIGHT
-    : Math.min(Math.max(MIN_HEIGHT, height), maxH);
+  height: number
+): { x: number; y: number } {
+  if (typeof window === "undefined") return { x, y };
   return {
-    width: nextWidth,
-    height: nextHeight,
     x: Math.min(
       Math.max(EDGE_PAD, x),
-      Math.max(EDGE_PAD, window.innerWidth - nextWidth - EDGE_PAD)
+      Math.max(EDGE_PAD, window.innerWidth - width - EDGE_PAD)
     ),
     y: Math.min(
       Math.max(EDGE_PAD, y),
-      Math.max(EDGE_PAD, window.innerHeight - nextHeight - EDGE_PAD)
+      Math.max(EDGE_PAD, window.innerHeight - height - EDGE_PAD)
     ),
   };
 }
@@ -211,21 +193,27 @@ type AdminMeetingNotesProps = {
   onOpenChange: (open: boolean) => void;
 };
 
+/**
+ * Placement model:
+ * - Default: CSS mid-right (`right` + `top: 50%` + `translateY(-50%)`) — no JS coords.
+ * - After drag: switch to pixel `left`/`top` from the pointer.
+ * - Reopening always resets to CSS mid-right.
+ * - Portaled to document.body so parent layout can't skew `position: fixed`.
+ */
 export function AdminMeetingNotes({
   school,
   open,
   onOpenChange,
 }: AdminMeetingNotesProps) {
-  const [hydrated, setHydrated] = useState(false);
-  const [position, setPosition] = useState({ x: EDGE_PAD, y: EDGE_PAD });
-  const [size, setSize] = useState({
-    width: DEFAULT_WIDTH,
-    height: DEFAULT_HEIGHT,
-  });
+  const [mounted, setMounted] = useState(false);
+  const [size, setSize] = useState(() => loadSavedSize());
   const [minimized, setMinimized] = useState(false);
+  const [dragged, setDragged] = useState(false);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
   const [record, setRecord] = useState<MeetingNoteRecord>(() => emptyNote());
   const [copied, setCopied] = useState(false);
 
+  const panelRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
     startX: number;
     startY: number;
@@ -237,84 +225,61 @@ export function AdminMeetingNotes({
     startY: number;
     originW: number;
     originH: number;
+    originX: number;
+    originY: number;
   } | null>(null);
   const saveTimerRef = useRef<number | null>(null);
   const schoolRef = useRef(school);
   const recordRef = useRef(record);
   recordRef.current = record;
-  const sizeRef = useRef(size);
-  sizeRef.current = size;
-  const expandedHeightRef = useRef(DEFAULT_HEIGHT);
+  const expandedHeightRef = useRef(size.height);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!school.trim()) return;
-    const ui = loadUiState();
-    const sizeClamped = clampPanel(
-      EDGE_PAD,
-      EDGE_PAD,
-      ui.width,
-      ui.height,
-      false
-    );
-    setSize({ width: sizeClamped.width, height: sizeClamped.height });
-    expandedHeightRef.current = Math.max(MIN_HEIGHT, sizeClamped.height);
-    setMinimized(false);
     setRecord(loadNoteRecord(school));
     schoolRef.current = school;
-    onOpenChange(false);
-    setHydrated(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate on mount only
-  }, []);
+  }, [school]);
 
-  // Always place mid-right when the panel opens (ignore any old saved coords).
+  // Every open: snap back to CSS mid-right (clear any dragged pixel placement).
   useEffect(() => {
-    if (!hydrated || !open) return;
-    const width = sizeRef.current.width;
-    const height = Math.max(MIN_HEIGHT, sizeRef.current.height);
-    const mid = defaultPosition(width, height);
-    const placed = clampPanel(mid.x, mid.y, width, height, false);
+    if (!open) return;
+    setDragged(false);
     setMinimized(false);
-    setSize({ width: placed.width, height: placed.height });
-    setPosition({ x: placed.x, y: placed.y });
-  }, [open, hydrated]);
+    setSize((prev) => clampSize(prev.width, prev.height));
+  }, [open]);
 
   useEffect(() => {
-    if (!hydrated || !school.trim()) return;
+    if (!school.trim()) return;
     if (schoolRef.current === school) return;
     saveNoteRecord(schoolRef.current, recordRef.current);
-    if (saveTimerRef.current !== null) {
-      window.clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
     schoolRef.current = school;
     setRecord(loadNoteRecord(school));
-  }, [school, hydrated]);
+  }, [school]);
 
   useEffect(() => {
-    if (!hydrated || !school.trim()) return;
     try {
-      const next: PanelUiState = {
-        width: size.width,
-        height: minimized
-          ? expandedHeightRef.current
-          : Math.max(MIN_HEIGHT, size.height),
-        minimized,
-      };
-      if (!minimized) {
-        expandedHeightRef.current = next.height;
-      }
-      localStorage.setItem(NOTES_UI_KEY, JSON.stringify(next));
+      localStorage.setItem(
+        NOTES_SIZE_KEY,
+        JSON.stringify({
+          width: size.width,
+          height: minimized ? expandedHeightRef.current : size.height,
+        })
+      );
     } catch {
       // ignore
     }
-  }, [size, minimized, hydrated, school]);
+  }, [size, minimized]);
 
   useEffect(() => {
-    if (!hydrated || !school.trim()) return;
+    if (!school.trim()) return;
     if (saveTimerRef.current !== null) {
       window.clearTimeout(saveTimerRef.current);
     }
-    const noteSchool = schoolRef.current;
+    const noteSchool = school;
     saveTimerRef.current = window.setTimeout(() => {
       saveNoteRecord(noteSchool, record);
     }, 250);
@@ -323,25 +288,7 @@ export function AdminMeetingNotes({
         window.clearTimeout(saveTimerRef.current);
       }
     };
-  }, [record, hydrated, school]);
-
-  useEffect(() => {
-    const onWindowResize = () => {
-      setPosition((prev) => {
-        const next = clampPanel(
-          prev.x,
-          prev.y,
-          sizeRef.current.width,
-          sizeRef.current.height,
-          minimized
-        );
-        setSize({ width: next.width, height: next.height });
-        return { x: next.x, y: next.y };
-      });
-    };
-    window.addEventListener("resize", onWindowResize);
-    return () => window.removeEventListener("resize", onWindowResize);
-  }, [minimized]);
+  }, [record, school]);
 
   const endInteraction = useCallback(() => {
     dragRef.current = null;
@@ -353,29 +300,34 @@ export function AdminMeetingNotes({
       if (dragRef.current) {
         const dx = event.clientX - dragRef.current.startX;
         const dy = event.clientY - dragRef.current.startY;
-        const next = clampPanel(
-          dragRef.current.originX + dx,
-          dragRef.current.originY + dy,
-          sizeRef.current.width,
-          sizeRef.current.height,
-          minimized
+        const height = minimized ? MINIMIZED_HEIGHT : size.height;
+        setPosition(
+          clampPoint(
+            dragRef.current.originX + dx,
+            dragRef.current.originY + dy,
+            size.width,
+            height
+          )
         );
-        setPosition({ x: next.x, y: next.y });
         return;
       }
       if (resizeRef.current && !minimized) {
         const dx = event.clientX - resizeRef.current.startX;
         const dy = event.clientY - resizeRef.current.startY;
-        const next = clampPanel(
-          position.x,
-          position.y,
+        const next = clampSize(
           resizeRef.current.originW + dx,
-          resizeRef.current.originH + dy,
-          false
+          resizeRef.current.originH + dy
         );
-        setSize({ width: next.width, height: next.height });
+        setSize(next);
         expandedHeightRef.current = next.height;
-        setPosition({ x: next.x, y: next.y });
+        setPosition(
+          clampPoint(
+            resizeRef.current.originX,
+            resizeRef.current.originY,
+            next.width,
+            next.height
+          )
+        );
       }
     };
     const onUp = () => endInteraction();
@@ -387,16 +339,24 @@ export function AdminMeetingNotes({
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [endInteraction, minimized, position.x, position.y]);
+  }, [endInteraction, minimized, size.height, size.width]);
 
   const startDrag = (event: ReactPointerEvent) => {
     if (event.button !== 0) return;
     event.preventDefault();
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    // First drag leaves CSS anchoring and locks to pixel coords.
+    if (!dragged) {
+      setDragged(true);
+      setPosition({ x: rect.left, y: rect.top });
+    }
     dragRef.current = {
       startX: event.clientX,
       startY: event.clientY,
-      originX: position.x,
-      originY: position.y,
+      originX: dragged ? position.x : rect.left,
+      originY: dragged ? position.y : rect.top,
     };
   };
 
@@ -404,11 +364,20 @@ export function AdminMeetingNotes({
     if (event.button !== 0 || minimized) return;
     event.preventDefault();
     event.stopPropagation();
+    const el = panelRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (!dragged) {
+      setDragged(true);
+      setPosition({ x: rect.left, y: rect.top });
+    }
     resizeRef.current = {
       startX: event.clientX,
       startY: event.clientY,
       originW: size.width,
       originH: size.height,
+      originX: dragged ? position.x : rect.left,
+      originY: dragged ? position.y : rect.top,
     };
   };
 
@@ -436,8 +405,7 @@ export function AdminMeetingNotes({
       record.schoolLeaderParticipant.trim();
     if (!hasContent) return;
     if (!window.confirm("Clear meeting notes for this school?")) return;
-    const cleared = emptyNote();
-    setRecord(cleared);
+    setRecord(emptyNote());
     try {
       localStorage.removeItem(schoolNoteKey(school));
       localStorage.removeItem(`${NOTES_DATA_PREFIX_V1}${school.trim()}`);
@@ -449,15 +417,9 @@ export function AdminMeetingNotes({
   const toggleMinimized = () => {
     setMinimized((prev) => {
       if (prev) {
-        const next = clampPanel(
-          position.x,
-          position.y,
-          size.width,
-          expandedHeightRef.current,
-          false
+        setSize((s) =>
+          clampSize(s.width, Math.max(MIN_HEIGHT, expandedHeightRef.current))
         );
-        setSize({ width: next.width, height: next.height });
-        setPosition({ x: next.x, y: next.y });
         return false;
       }
       expandedHeightRef.current = Math.max(MIN_HEIGHT, size.height);
@@ -465,17 +427,34 @@ export function AdminMeetingNotes({
     });
   };
 
-  if (!school.trim() || !hydrated || !open) return null;
+  if (!mounted || !school.trim() || !open) return null;
 
-  return (
-    <div
-      className="fixed z-[60] flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl relative"
-      style={{
+  const panelHeight = minimized ? MINIMIZED_HEIGHT : size.height;
+
+  // Default placement is pure CSS — mid-right of the viewport.
+  const panelStyle: CSSProperties = dragged
+    ? {
         left: position.x,
         top: position.y,
+        right: "auto",
         width: size.width,
-        height: minimized ? MINIMIZED_HEIGHT : size.height,
-      }}
+        height: panelHeight,
+        transform: "none",
+      }
+    : {
+        right: EDGE_PAD,
+        top: "50%",
+        left: "auto",
+        width: size.width,
+        height: panelHeight,
+        transform: "translateY(-50%)",
+      };
+
+  return createPortal(
+    <div
+      ref={panelRef}
+      className="fixed z-[200] relative flex flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl"
+      style={panelStyle}
       role="dialog"
       aria-label="Meeting notes"
     >
@@ -565,7 +544,7 @@ export function AdminMeetingNotes({
               </p>
             </div>
           </div>
-          <div className="min-h-0 flex-1 p-2">
+          <div className="relative min-h-0 flex-1 p-2">
             <Textarea
               value={record.body}
               onChange={(e) => updateField("body", e.target.value)}
@@ -623,6 +602,7 @@ export function AdminMeetingNotes({
           </div>
         </>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
