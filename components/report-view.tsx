@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { FloorPlanViewer } from "./floor-plan-viewer";
 import { MapViewer } from "./map-viewer";
-import { SURVEY_QUESTIONS, PRIORITIZATION_CATEGORIES, DONT_KNOW_RATING, isRatingScored, formatRatingDisplay, type SurveyData } from "@/lib/survey-data";
+import { SURVEY_QUESTIONS, PRIORITIZATION_CATEGORIES, DONT_KNOW_RATING, NA_RATING, isRatingScored, formatRatingDisplay, type SurveyData } from "@/lib/survey-data";
 import type { SurveySubmissionPayload } from "@/lib/submit-survey";
 import { clearSurveyDraft } from "@/lib/survey-draft";
 import { getSchoolByName } from "@/lib/schools-data";
@@ -179,7 +179,9 @@ export function ReportView({
   };
 
   const getRatingBg = (rating: number) => {
-    if (rating === DONT_KNOW_RATING) return "bg-muted text-muted-foreground";
+    if (rating === DONT_KNOW_RATING || rating === NA_RATING) {
+      return "bg-muted text-muted-foreground";
+    }
     if (rating >= 4) return "bg-green-100 text-green-800";
     if (rating >= 3) return "bg-yellow-100 text-yellow-800";
     if (rating >= 2) return "bg-orange-100 text-orange-800";
@@ -646,7 +648,11 @@ export function ReportView({
                                     response?.rating || 0
                                   )}`}
                                 >
-                                  {response?.rating === DONT_KNOW_RATING ? (
+                                  {response?.rating === NA_RATING ? (
+                                    <span className="text-sm font-semibold leading-tight">
+                                      N/A
+                                    </span>
+                                  ) : response?.rating === DONT_KNOW_RATING ? (
                                     <span className="text-sm font-semibold leading-tight">
                                       I don&apos;t know
                                     </span>

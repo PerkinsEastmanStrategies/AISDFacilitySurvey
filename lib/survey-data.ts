@@ -582,11 +582,14 @@ export const SCHOOL_LEADER_FCA_QUESTION_IDS = new Set([54, 55, 56, 57, 58, 59, 6
 /** Sentinel rating for FCA "I don't know" — counts as answered but excluded from scoring. */
 export const DONT_KNOW_RATING = -1;
 
+/** Sentinel rating for FCA "N/A" — counts as answered but excluded from scoring. */
+export const NA_RATING = -2;
+
 export const FCA_LIKERT_SCALE_NOTE =
-  "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree). Select \"I don't know\" if you are unable to answer — it will not be included in scoring.";
+  "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree). Select \"N/A\" if the item does not apply, or \"I don't know\" if you are unable to answer — neither is included in scoring.";
 
 export function isRatingAnswered(rating: number): boolean {
-  return rating > 0 || rating === DONT_KNOW_RATING;
+  return rating > 0 || rating === DONT_KNOW_RATING || rating === NA_RATING;
 }
 
 export function isRatingScored(rating: number): boolean {
@@ -603,6 +606,7 @@ export function formatRatingDisplay(
   rating: number,
   section?: SurveyQuestion["section"]
 ): string {
+  if (rating === NA_RATING) return "N/A";
   if (rating === DONT_KNOW_RATING) return "I don't know";
   if (rating <= 0) return "-";
 

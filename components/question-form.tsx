@@ -8,6 +8,7 @@ import {
   SURVEY_QUESTIONS,
   PRIORITIZATION_CATEGORIES,
   DONT_KNOW_RATING,
+  NA_RATING,
   formatRatingDisplay,
   isFacilityConditionQuestion,
   type QuestionResponse,
@@ -46,7 +47,7 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
   };
 
   const getRatingColor = (rating: number) => {
-    if (rating === DONT_KNOW_RATING) return "bg-slate-500";
+    if (rating === DONT_KNOW_RATING || rating === NA_RATING) return "bg-slate-500";
     switch (rating) {
       case 1:
         return "bg-red-500";
@@ -86,18 +87,32 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
           </button>
         ))}
         {isFca && (
-          <button
-            type="button"
-            data-tour="fca-dont-know"
-            onClick={() => onChange({ ...safeResponse, rating: DONT_KNOW_RATING })}
-            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-all ${
-              safeResponse.rating === DONT_KNOW_RATING
-                ? "bg-slate-600 text-white shadow-sm"
-                : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
-            }`}
-          >
-            I don&apos;t know
-          </button>
+          <>
+            <button
+              type="button"
+              data-tour="fca-na"
+              onClick={() => onChange({ ...safeResponse, rating: NA_RATING })}
+              className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-all ${
+                safeResponse.rating === NA_RATING
+                  ? "bg-slate-600 text-white shadow-sm"
+                  : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
+              }`}
+            >
+              N/A
+            </button>
+            <button
+              type="button"
+              data-tour="fca-dont-know"
+              onClick={() => onChange({ ...safeResponse, rating: DONT_KNOW_RATING })}
+              className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-all ${
+                safeResponse.rating === DONT_KNOW_RATING
+                  ? "bg-slate-600 text-white shadow-sm"
+                  : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
+              }`}
+            >
+              I don&apos;t know
+            </button>
+          </>
         )}
       </div>
     );
