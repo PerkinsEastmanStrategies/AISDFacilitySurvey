@@ -33,6 +33,7 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
 
   const isFca = isFacilityConditionQuestion(question);
   const questionCode = "questionCode" in question ? question.questionCode : undefined;
+  const tip = "tip" in question && typeof question.tip === "string" ? question.tip : undefined;
 
   const getRatingLabel = (rating: number) => {
     if (rating === 0) return "Select a rating";
@@ -116,6 +117,12 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
             <p className="mt-px text-[11px] font-semibold leading-snug text-foreground">
               {question.text}
             </p>
+            {tip && (
+              <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+                <span className="font-semibold text-foreground/80">Tip: </span>
+                {tip}
+              </p>
+            )}
           </div>
         </div>
 
@@ -161,6 +168,12 @@ export function QuestionForm({ questionId, response, onChange, compact = false }
         <CardTitle className="mt-1 font-sans text-xs font-bold leading-snug text-foreground">
           {question.text}
         </CardTitle>
+        {tip && (
+          <p className="mt-1.5 rounded-md border border-border/60 bg-muted/40 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+            <span className="font-semibold text-foreground">Tip: </span>
+            {tip}
+          </p>
+        )}
       </CardHeader>
       <CardContent className="space-y-3 px-2.5">
         {question.type === "ranking" ? (

@@ -154,8 +154,9 @@ export function IntroForm({
           </Select>
           {data.role === "school_leader" && (
             <p className="text-xs text-muted-foreground">
-              School Leaders complete Educational Suitability plus a short set of
-              campus condition questions.
+              School Leaders complete Educational Suitability plus six campus
+              condition questions covering the same key facility categories as
+              the Operations survey.
             </p>
           )}
           {isOperations && (

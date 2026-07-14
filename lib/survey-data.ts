@@ -495,61 +495,78 @@ export const SURVEY_QUESTIONS = [
     color: "hsl(280, 60%, 50%)",
   },
   // School Leader (principal) simplified facility condition questions —
-  // each is its own step (like Educational Suitability), not a category group.
+  // six combined prompts covering every Operations FCA category.
+  // Each is its own step (like Educational Suitability), not a category group.
   {
     id: 54,
     questionCode: "P1",
-    text: "The building maintains comfortable temperatures throughout the school year.",
-    category: "Heating & Cooling",
-    area: "Heating & Cooling",
+    text: "Parking lots, drives, sidewalks, drainage, and outdoor activity areas (playgrounds, fields, courtyards) are in good physical condition and safe for daily use.",
+    category: "Site & Grounds",
+    area: "Site & Grounds",
     section: "Facility Condition",
     type: "rating",
-    color: "hsl(15, 75%, 50%)",
+    color: "hsl(95, 50%, 42%)",
+    tip: "Think about potholes, uneven pavement, standing water, muddy spots, erosion, and the condition of play/athletic areas and arrival zones.",
   },
   {
     id: 55,
     questionCode: "P2",
-    text: "Water intrusion, roof leaks, or moisture issues rarely disrupt teaching and learning.",
-    category: "Water Intrusion",
-    area: "Water Intrusion",
+    text: "The roof, exterior walls, windows, and exterior doors keep the building dry and secure, and are in good physical condition.",
+    category: "Building Exterior",
+    area: "Roof & Building Exterior",
     section: "Facility Condition",
     type: "rating",
-    color: "hsl(15, 75%, 50%)",
+    color: "hsl(210, 55%, 48%)",
+    tip: "Include roof leak answers here — active leaks, stained ceiling tiles, bucket placements during rain, and water intrusion near windows or exterior walls. Also note sticky or unreliable exterior doors.",
   },
   {
     id: 56,
     questionCode: "P3",
-    text: "Classrooms and interior spaces are clean, well maintained, and in good physical condition.",
-    category: "Interior Finishes",
-    area: "Interior Finishes",
+    text: "Interior ceilings, flooring, walls/finishes, and restrooms throughout the building are in good physical condition.",
+    category: "Interior Conditions",
+    area: "Interior Conditions",
     section: "Facility Condition",
     type: "rating",
-    color: "hsl(15, 75%, 50%)",
+    color: "hsl(35, 70%, 48%)",
+    tip: "Consider worn flooring, damaged walls, stained or missing ceiling tiles, and whether restrooms feel well maintained and fully functional.",
   },
   {
     id: 57,
     questionCode: "P4",
-    text: "Outdoor spaces, including playgrounds, fields, sidewalks, and arrival areas, are safe and well maintained.",
-    category: "Outdoor Areas",
-    area: "Outdoor Areas",
+    text: "Heating, cooling, ventilation, plumbing, lighting, and electrical service reliably support comfortable and continuous school operations.",
+    category: "Building Systems",
+    area: "HVAC, Plumbing & Electrical",
     section: "Facility Condition",
     type: "rating",
-    color: "hsl(15, 75%, 50%)",
+    color: "hsl(190, 65%, 42%)",
+    tip: "Include hot/cold classrooms, air quality concerns, noisy equipment, recurring plumbing leaks or fixture failures, dim/flickering lights, and power outages. Mark locations on the floor plan when you can.",
   },
   {
     id: 58,
     questionCode: "P5",
-    text: "The overall physical condition of this facility supports teaching and learning.",
-    category: "Overall Building Condition",
-    area: "Overall Building Condition",
+    text: "Fire/life-safety systems, building security and entry controls, and accessibility features (including elevators/lifts, where present) work reliably and support a safe campus.",
+    category: "Safety, Security & Accessibility",
+    area: "Safety, Security & Accessibility",
     section: "Facility Condition",
     type: "rating",
-    color: "hsl(15, 75%, 50%)",
+    color: "hsl(0, 65%, 50%)",
+    tip: "Think about fire alarms, secure entry reliability during the school day, physical safety concerns, emergency drill issues, and accessibility barriers for students or staff.",
+  },
+  {
+    id: 59,
+    questionCode: "P6",
+    text: "Specialty spaces (gym, cafeteria/kitchen, auditorium/stage, labs, shops, music rooms, etc.) are in good physical condition, and overall the facility rarely disrupts teaching and learning.",
+    category: "Specialty Areas & Overall",
+    area: "Specialty Areas & Overall Condition",
+    section: "Facility Condition",
+    type: "rating",
+    color: "hsl(280, 60%, 50%)",
+    tip: "If issues are limited to certain specialty rooms, note them here (and pin them on the plan). Also reflect whether building problems frequently interrupt classes or school programs.",
   },
 ] as const;
 
 /** Simplified Facility Condition questions shown only to School Leaders. */
-export const SCHOOL_LEADER_FCA_QUESTION_IDS = new Set([54, 55, 56, 57, 58]);
+export const SCHOOL_LEADER_FCA_QUESTION_IDS = new Set([54, 55, 56, 57, 58, 59]);
 
 /** Sentinel rating for FCA "I don't know" — counts as answered but excluded from scoring. */
 export const DONT_KNOW_RATING = -1;
@@ -614,7 +631,7 @@ export type SurveyQuestion = (typeof SURVEY_QUESTIONS)[number];
 
 /**
  * Returns the questions a given role should answer.
- * - School Leaders: Educational Suitability + a short Campus Condition set.
+ * - School Leaders: Educational Suitability + six combined Campus Condition prompts.
  * - Operations Staff: the full Facility Condition (FCA) question set only.
  */
 export function getQuestionsForRole(role: SurveyData["role"]): SurveyQuestion[] {
