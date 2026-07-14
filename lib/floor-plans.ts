@@ -205,7 +205,9 @@ export async function fetchFloorPlanSvg(
 ): Promise<string | null> {
   const floors = await getAvailableFloors(buildingName);
   if (floors.length === 0) return fallbackSvg ?? null;
-  return fetchFloorPlanSvgForLevel(buildingName, floors[0], fallbackSvg, options);
+  const floor = pickDefaultFloor(floors);
+  if (!floor) return fallbackSvg ?? null;
+  return fetchFloorPlanSvgForLevel(buildingName, floor, fallbackSvg, options);
 }
 
 export async function fetchFloorPlanSvgForFloorId(
@@ -215,7 +217,9 @@ export async function fetchFloorPlanSvgForFloorId(
   options?: { preferMobile?: boolean }
 ): Promise<string | null> {
   const floors = await getAvailableFloors(buildingName);
-  const floor = floors.find((entry) => entry.id === floorId) ?? floors[0];
+  const floor =
+    floors.find((entry) => entry.id === floorId) ??
+    pickDefaultFloor(floors);
   if (!floor) return fallbackSvg ?? null;
   return fetchFloorPlanSvgForLevel(buildingName, floor, fallbackSvg, options);
 }
