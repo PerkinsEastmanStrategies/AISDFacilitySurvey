@@ -47,12 +47,6 @@ export const QUESTION_TOUR_STEPS: TourStep[] = [
     placement: "right",
   },
   {
-    target: "ranking",
-    title: "Rank modernization priorities",
-    body: "On Campus Improvement Priorities, select up to five categories in order of priority (first = highest). Add optional notes in the text box.",
-    placement: "right",
-  },
-  {
     target: "annotation-toolbar",
     title: "Spatial comment tools",
     body: "Use Pin, Circle, or Freeform to mark strengths and challenges on the plan or map. Toggle Strength vs Challenge before you draw. Pins identify room numbers when the floor plan supports it.",
