@@ -1119,7 +1119,7 @@ export default function SurveyApp({
                                 : "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree)."}
                             </p>
                           </div>
-                          <StepSection letter="A" title="Rate the statements">
+                          <StepSection letter="A" title="Rate and explain each statement">
                             <div className="space-y-2">
                               {currentPanel.questions.map((q) => {
                                 const response =
@@ -1132,12 +1132,13 @@ export default function SurveyApp({
                                   };
                                 return (
                                   <QuestionForm
-                                    key={`rating-${q.id}`}
+                                    key={q.id}
                                     questionId={q.id}
                                     response={response}
                                     onChange={handleResponseChange}
                                     compact
-                                    parts="prompt-rating"
+                                    parts="full"
+                                    annotationToolsPosition="below"
                                   />
                                 );
                               })}
@@ -1157,30 +1158,6 @@ export default function SurveyApp({
                                 disabled={!surveyData.svgContent}
                                 showHeading={false}
                               />
-                            </div>
-                          </StepSection>
-                          <StepSection letter="C" title="Explain your ratings">
-                            <div className="space-y-2">
-                              {currentPanel.questions.map((q) => {
-                                const response =
-                                  surveyData.responses.find(
-                                    (r) => r.questionId === q.id
-                                  ) ?? {
-                                    questionId: q.id,
-                                    rating: 0,
-                                    explanation: "",
-                                  };
-                                return (
-                                  <QuestionForm
-                                    key={`explain-${q.id}`}
-                                    questionId={q.id}
-                                    response={response}
-                                    onChange={handleResponseChange}
-                                    compact
-                                    parts="explanation"
-                                  />
-                                );
-                              })}
                             </div>
                           </StepSection>
                         </div>

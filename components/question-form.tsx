@@ -16,8 +16,11 @@ import {
 } from "@/lib/survey-data";
 import { CategoryRanking } from "./category-ranking";
 
-const EXPLANATION_PLACEHOLDER =
+const EXPLANATION_PLACEHOLDER_TOOLS_ABOVE =
   "Please explain your rating. Please use the annotation tools above to mark specific areas on the floor plan or site map.";
+
+const EXPLANATION_PLACEHOLDER_TOOLS_BELOW =
+  "Please explain your rating. Please use the annotation tools below to mark specific areas on the floor plan or site map.";
 
 export type QuestionFormParts = "full" | "prompt-rating" | "explanation";
 
@@ -36,6 +39,8 @@ interface QuestionFormProps {
    * and the explanation box: `prompt-rating` then tools then `explanation`.
    */
   parts?: QuestionFormParts;
+  /** Where Mark Locations sits relative to the explanation for guide copy. */
+  annotationToolsPosition?: "above" | "below";
 }
 
 export function QuestionForm({
@@ -44,6 +49,7 @@ export function QuestionForm({
   onChange,
   compact = false,
   parts = "full",
+  annotationToolsPosition = "above",
 }: QuestionFormProps) {
   const question = SURVEY_QUESTIONS.find((q) => q.id === questionId);
   const safeResponse = response ?? {
@@ -53,6 +59,11 @@ export function QuestionForm({
   };
 
   if (!question) return null;
+
+  const explanationPlaceholder =
+    annotationToolsPosition === "below"
+      ? EXPLANATION_PLACEHOLDER_TOOLS_BELOW
+      : EXPLANATION_PLACEHOLDER_TOOLS_ABOVE;
 
   const isFca = isFacilityConditionQuestion(question);
   const questionCode = "questionCode" in question ? question.questionCode : undefined;
@@ -159,7 +170,7 @@ export function QuestionForm({
         onChange={(e) =>
           onChange({ ...safeResponse, explanation: e.target.value })
         }
-        placeholder={EXPLANATION_PLACEHOLDER}
+        placeholder={explanationPlaceholder}
         rows={opts?.compact ? 1 : 2}
         className={
           opts?.compact
