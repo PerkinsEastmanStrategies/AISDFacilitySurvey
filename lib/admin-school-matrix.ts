@@ -79,7 +79,13 @@ export async function buildSchoolMatrix(
         latestOperations: ops[0] ?? null,
       };
     }),
-  ];
+  ].sort((a, b) =>
+    (a.displayName || a.school).localeCompare(
+      b.displayName || b.school,
+      undefined,
+      { sensitivity: "base" }
+    )
+  );
 
   return { rows, source: manifest.source };
 }

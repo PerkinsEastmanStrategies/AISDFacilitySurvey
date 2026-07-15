@@ -77,9 +77,11 @@ export async function loadManifestServer(): Promise<ServerManifestResult> {
 export function toManifestSchoolOptions(
   rows: FloorPlanManifestRow[]
 ): ManifestSchoolOption[] {
-  return rows.map((row) => ({
-    name: row.schoolName,
-    label: row.updatedName || row.schoolName,
-    hasFloorPlans: rowHasFloorPlans(row),
-  }));
+  return rows
+    .map((row) => ({
+      name: row.schoolName,
+      label: row.updatedName || row.schoolName,
+      hasFloorPlans: rowHasFloorPlans(row),
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
 }

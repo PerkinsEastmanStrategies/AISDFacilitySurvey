@@ -255,11 +255,15 @@ export async function loadManifestSchoolOptions(): Promise<
   const manifest = await loadFloorPlanManifest();
   if (!manifestLoadedSuccessfully || manifest.length === 0) return [];
 
-  return manifest.map((row) => ({
-    name: row.schoolName,
-    label: row.updatedName || row.schoolName,
-    hasFloorPlans: rowHasFloorPlans(row),
-  }));
+  return manifest
+    .map((row) => ({
+      name: row.schoolName,
+      label: row.updatedName || row.schoolName,
+      hasFloorPlans: rowHasFloorPlans(row),
+    }))
+    .sort((a, b) =>
+      a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
+    );
 }
 
 /** Default single-floor filename when manifest is unavailable. */

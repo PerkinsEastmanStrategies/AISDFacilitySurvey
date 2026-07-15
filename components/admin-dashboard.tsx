@@ -119,8 +119,10 @@ export function AdminDashboard() {
       }));
     }
     return Array.from(new Set(submissions.map((item) => item.school)))
-      .sort((a, b) => a.localeCompare(b))
-      .map((name) => ({ name, label: name }));
+      .map((name) => ({ name, label: name }))
+      .sort((a, b) =>
+        a.label.localeCompare(b.label, undefined, { sensitivity: "base" })
+      );
   }, [schoolMatrix, submissions]);
 
   const schoolSubmissions = useMemo(
