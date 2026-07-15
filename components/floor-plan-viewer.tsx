@@ -61,7 +61,10 @@ interface FloorPlanViewerProps {
   classification: Classification;
   onAddAnnotation: (annotation: Omit<Annotation, "id">) => void;
   onRemoveAnnotation: (id: string) => void;
-  onUpdateAnnotation: (id: string, updates: Partial<Pick<Annotation, "comment">>) => void;
+  onUpdateAnnotation: (
+    id: string,
+    updates: Partial<Pick<Annotation, "comment" | "classification" | "color">>
+  ) => void;
   onToolChange: (tool: Tool) => void;
   filterQuestionId?: number | null;
   filterQuestionIds?: number[] | null;
@@ -129,6 +132,9 @@ export function FloorPlanViewer({
   const [highlightPolygon, setHighlightPolygon] = useState<{ x: number; y: number }[] | null>(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
   const [editComment, setEditComment] = useState("");
+  const [editClassification, setEditClassification] = useState<
+    "strength" | "weakness"
+  >("strength");
   const [viewBox, setViewBox] = useState<ViewBox | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   /** Bumps when a new SVG should be mounted into the host (avoids keeping a second full SVG string in React state). */
@@ -669,16 +675,24 @@ export function FloorPlanViewer({
     e.stopPropagation();
     setSelectedAnnotation(annotation);
     setEditComment(annotation.comment ?? "");
+    setEditClassification(annotation.classification);
   };
 
   const closeAnnotationPopover = () => {
     setSelectedAnnotation(null);
     setEditComment("");
+    setEditClassification("strength");
   };
 
   const saveSelectedAnnotationComment = () => {
     if (!selectedAnnotation) return;
-    onUpdateAnnotation(selectedAnnotation.id, { comment: editComment.trim() });
+    const color =
+      editClassification === "strength" ? "#059669" : "#dc2626";
+    onUpdateAnnotation(selectedAnnotation.id, {
+      comment: editComment.trim(),
+      classification: editClassification,
+      color,
+    });
     closeAnnotationPopover();
   };
 
@@ -1211,17 +1225,6 @@ export function FloorPlanViewer({
                 <p className="truncate text-sm font-medium text-foreground">
                   {questionCategoryLabel(selectedAnnotation.questionId)}
                 </p>
-                <span
-                  className={`text-sm font-medium ${
-                    selectedAnnotation.classification === "strength"
-                      ? "text-emerald-700"
-                      : "text-rose-700"
-                  }`}
-                >
-                  {selectedAnnotation.classification === "strength"
-                    ? "Strength"
-                    : "Challenge"}
-                </span>
               </div>
               <Button
                 variant="ghost"
@@ -1233,6 +1236,39 @@ export function FloorPlanViewer({
               </Button>
             </div>
             {renderAnnotationRoomContext(selectedAnnotation)}
+            <div className="mb-3">
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                Mark as
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={editClassification === "strength" ? "default" : "outline"}
+                  className={
+                    editClassification === "strength"
+                      ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+                      : undefined
+                  }
+                  onClick={() => setEditClassification("strength")}
+                >
+                  Strength
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={editClassification === "weakness" ? "default" : "outline"}
+                  className={
+                    editClassification === "weakness"
+                      ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
+                      : undefined
+                  }
+                  onClick={() => setEditClassification("weakness")}
+                >
+                  Challenge
+                </Button>
+              </div>
+            </div>
             <textarea
               value={editComment}
               onChange={(e) => setEditComment(e.target.value)}

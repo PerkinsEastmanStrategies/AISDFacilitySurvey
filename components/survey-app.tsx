@@ -63,7 +63,7 @@ import {
   type FloorPlanManifestRow,
   type ManifestSchoolOption,
 } from "@/lib/floor-plan-manifest";
-import type { SurveySubmissionPayload } from "@/lib/submit-survey";
+import { isValidEmail, type SurveySubmissionPayload } from "@/lib/submit-survey";
 import Image from "next/image";
 
 type Step = SurveyStep;
@@ -104,11 +104,11 @@ function StepSection({
   children,
 }: {
   letter: "A" | "B" | "C";
-  title: string;
+  title: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="space-y-1.5" aria-label={`Step ${letter}: ${title}`}>
+    <section className="space-y-1.5">
       <div className="flex items-center gap-1.5">
         <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-primary text-[10px] font-bold text-primary-foreground">
           {letter}
@@ -514,7 +514,7 @@ export default function SurveyApp({
 
   const handleUpdateAnnotation = (
     id: string,
-    updates: Partial<Pick<Annotation, "comment">>
+    updates: Partial<Pick<Annotation, "comment" | "classification" | "color">>
   ) => {
     setSurveyData((prev) => ({
       ...prev,
@@ -674,12 +674,12 @@ export default function SurveyApp({
 
   const canProceed = () => {
     if (step === "intro") {
-      return (
+      return Boolean(
         surveyData.school &&
-        surveyData.role &&
-        surveyData.positionTitle.trim() &&
-        surveyData.principalName &&
-        surveyData.email
+          surveyData.role &&
+          surveyData.positionTitle.trim() &&
+          surveyData.principalName.trim() &&
+          isValidEmail(surveyData.email)
       );
     }
     if (step === "questions") {
@@ -780,6 +780,7 @@ export default function SurveyApp({
         onAddAnnotation={handleAddAnnotation}
         onRemoveAnnotation={handleRemoveAnnotation}
         onUpdateAnnotation={handleUpdateAnnotation}
+        onToolChange={setAnnotationTool}
         annotationsEnabled={annotationsEnabledForViewer}
         focusLocation={selectedSchool?.coordinates ?? null}
         focusLabel={selectedSchool?.buildingName ?? null}
@@ -1177,7 +1178,15 @@ export default function SurveyApp({
                                 : "Rate each statement from 1 (Strongly Disagree) to 5 (Strongly Agree)."}
                             </p>
                           </div>
-                          <StepSection letter="A" title="Rate and explain each statement">
+                          <StepSection
+                            letter="A"
+                            title={
+                              <>
+                                Rate each statement{" "}
+                                <span className="text-destructive">*</span>
+                              </>
+                            }
+                          >
                             <div className="space-y-2">
                               {currentPanel.questions.map((q) => {
                                 const response =
@@ -1204,7 +1213,14 @@ export default function SurveyApp({
                           </StepSection>
                           <StepSection
                             letter="B"
-                            title="Mark locations on the floor plan or site map"
+                            title={
+                              <>
+                                Mark locations on the floor plan or site map{" "}
+                                <span className="font-normal text-muted-foreground">
+                                  (optional)
+                                </span>
+                              </>
+                            }
                           >
                             <div data-tour="annotation-toolbar">
                               <AnnotationToolbar
@@ -1227,7 +1243,15 @@ export default function SurveyApp({
                         />
                       ) : (
                         <div className="space-y-3">
-                          <StepSection letter="A" title="Rate this statement">
+                          <StepSection
+                            letter="A"
+                            title={
+                              <>
+                                Rate this statement{" "}
+                                <span className="text-destructive">*</span>
+                              </>
+                            }
+                          >
                             <QuestionForm
                               questionId={currentQuestion.id}
                               response={currentResponse}
@@ -1237,7 +1261,14 @@ export default function SurveyApp({
                           </StepSection>
                           <StepSection
                             letter="B"
-                            title="Mark locations on the floor plan or site map"
+                            title={
+                              <>
+                                Mark locations on the floor plan or site map{" "}
+                                <span className="font-normal text-muted-foreground">
+                                  (optional)
+                                </span>
+                              </>
+                            }
                           >
                             <div data-tour="annotation-toolbar">
                               <AnnotationToolbar
@@ -1251,7 +1282,17 @@ export default function SurveyApp({
                               />
                             </div>
                           </StepSection>
-                          <StepSection letter="C" title="Explain your rating">
+                          <StepSection
+                            letter="C"
+                            title={
+                              <>
+                                Explain your rating{" "}
+                                <span className="font-normal text-muted-foreground">
+                                  (optional)
+                                </span>
+                              </>
+                            }
+                          >
                             <QuestionForm
                               questionId={currentQuestion.id}
                               response={currentResponse}
@@ -1316,6 +1357,13 @@ export default function SurveyApp({
               {submitError && (
                 <p className="text-center text-[11px] text-destructive">{submitError}</p>
               )}
+              {step === "intro" && primaryActionDisabled && (
+                <p className="text-center text-[10px] text-muted-foreground">
+                  Complete all required fields marked{" "}
+                  <span className="text-destructive">*</span>, including a valid
+                  email address, to continue.
+                </p>
+              )}
               <div className="flex justify-between gap-1.5">
                 <Button
                   variant="outline"
@@ -1332,6 +1380,11 @@ export default function SurveyApp({
                   onClick={handleNext}
                   disabled={primaryActionDisabled}
                   className="h-7 text-xs"
+                  title={
+                    step === "intro" && primaryActionDisabled
+                      ? "Complete all required fields, including a valid email"
+                      : undefined
+                  }
                 >
                   {isLastPanel ? (
                     <>

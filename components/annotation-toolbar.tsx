@@ -42,7 +42,8 @@ export function AnnotationToolbar({
         {showHeading && (
           <div>
             <p className="mb-px text-[11px] font-medium text-foreground">
-              Mark Locations on Floor Plan
+              Mark Locations on Floor Plan{" "}
+              <span className="font-normal text-muted-foreground">(optional)</span>
             </p>
             <p className="mb-1 text-[9px] leading-snug text-muted-foreground">
               Identify specific areas that are positive strengths or areas of concern related to this question.

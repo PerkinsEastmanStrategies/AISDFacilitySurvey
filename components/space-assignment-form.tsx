@@ -42,7 +42,8 @@ export function SpaceAssignmentForm({
         </div>
         <p className="mb-4 text-sm leading-relaxed text-muted-foreground">
           Select a program space, then click its room(s) on the floor plan. You can
-          place multiple rooms per space. Each placement is added to the table below.
+          place multiple rooms per space. Each placement is added to the table below.{" "}
+          <span className="text-muted-foreground">(optional)</span>
         </p>
 
         {!hasSvg ? (

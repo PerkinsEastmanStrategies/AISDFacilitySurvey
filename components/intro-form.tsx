@@ -17,6 +17,7 @@ import {
   type ManifestSchoolOption,
 } from "@/lib/floor-plan-manifest";
 import type { SurveyRole } from "@/lib/survey-data";
+import { isValidEmail } from "@/lib/submit-survey";
 
 interface SchoolInfo {
   school: string;
@@ -88,17 +89,30 @@ export function IntroForm({
   const handleChange = (field: keyof SchoolInfo, value: string) => {
     onChange({ ...data, [field]: value });
   };
+
+  const emailLooksInvalid =
+    data.email.trim().length > 0 && !isValidEmail(data.email);
+
+  const requiredMark = (
+    <span className="text-destructive" aria-hidden="true">
+      *
+    </span>
+  );
+
   return (
     <Card className="gap-2 border-border/60 py-2.5 shadow-sm">
       <CardHeader className="px-2.5 pb-1.5">
         <CardTitle className="font-heading text-sm font-bold text-foreground">School Information</CardTitle>
         <p className="mt-px text-[11px] text-muted-foreground">
-          Please provide details about your school to begin the assessment
+          Please provide details about your school to begin the assessment. Fields
+          marked with <span className="text-destructive">*</span> are required.
         </p>
       </CardHeader>
       <CardContent className="space-y-3 px-2.5">
         <div className="space-y-1" data-tour="school-select">
-          <Label htmlFor="school" className="text-[11px] font-semibold text-foreground">Select School</Label>
+          <Label htmlFor="school" className="text-[11px] font-semibold text-foreground">
+            Select School {requiredMark}
+          </Label>
           <Select value={data.school} onValueChange={(v) => handleChange("school", v)}>
             <SelectTrigger id="school" size="sm" className="h-7 w-full text-xs">
               <SelectValue
@@ -149,7 +163,9 @@ export function IntroForm({
         </div>
 
         <div className="space-y-1" data-tour="role-select">
-          <Label htmlFor="role" className="text-[11px] font-semibold text-foreground">Your Role</Label>
+          <Label htmlFor="role" className="text-[11px] font-semibold text-foreground">
+            Your Role {requiredMark}
+          </Label>
           <Select value={data.role || null} onValueChange={(v) => handleChange("role", v ?? "")}>
             <SelectTrigger
               id="role"
@@ -185,7 +201,7 @@ export function IntroForm({
             htmlFor="positionTitle"
             className="text-[11px] font-semibold text-foreground"
           >
-            Position Title
+            Position Title {requiredMark}
           </Label>
           <Input
             id="positionTitle"
@@ -205,7 +221,9 @@ export function IntroForm({
 
         <div className="grid gap-2.5 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label htmlFor="principalName" className="text-[11px] font-semibold text-foreground">Name</Label>
+            <Label htmlFor="principalName" className="text-[11px] font-semibold text-foreground">
+              Name {requiredMark}
+            </Label>
             <Input
               id="principalName"
               value={data.principalName}
@@ -215,15 +233,23 @@ export function IntroForm({
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="email" className="text-[11px] font-semibold text-foreground">Email Address</Label>
+            <Label htmlFor="email" className="text-[11px] font-semibold text-foreground">
+              Email Address {requiredMark}
+            </Label>
             <Input
               id="email"
               type="email"
               value={data.email}
               onChange={(e) => handleChange("email", e.target.value)}
-              placeholder="Enter email address"
+              placeholder="name@example.com"
+              aria-invalid={emailLooksInvalid}
               className="h-7 text-xs md:text-xs"
             />
+            {emailLooksInvalid && (
+              <p className="text-[10px] text-destructive">
+                Enter a valid email address (for example, name@austinisd.org).
+              </p>
+            )}
           </div>
         </div>
 
@@ -233,7 +259,8 @@ export function IntroForm({
               <Label htmlFor="schoolDescription" className="text-xs font-semibold leading-snug text-foreground">
                 In two or three sentences, what makes your school special and
                 unique? Consider your school&apos;s culture, sense of place, or
-                what students and staff connect with most.
+                what students and staff connect with most.{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
               </Label>
               <Textarea
                 id="schoolDescription"
@@ -248,7 +275,8 @@ export function IntroForm({
             <div className="space-y-1">
               <Label htmlFor="uniqueFeatures" className="text-xs font-semibold leading-snug text-foreground">
                 Does your school have any specialty programs or pathways (e.g.,
-                STEM, arts, music, dual language)? If so, please describe.
+                STEM, arts, music, dual language)? If so, please describe.{" "}
+                <span className="font-normal text-muted-foreground">(optional)</span>
               </Label>
               <Textarea
                 id="uniqueFeatures"

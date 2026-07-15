@@ -65,6 +65,12 @@ export function QuestionForm({
       ? EXPLANATION_PLACEHOLDER_TOOLS_BELOW
       : EXPLANATION_PLACEHOLDER_TOOLS_ABOVE;
 
+  const requiredMark = (
+    <span className="text-destructive" aria-hidden="true">
+      *
+    </span>
+  );
+
   const isFca = isFacilityConditionQuestion(question);
   const questionCode = "questionCode" in question ? question.questionCode : undefined;
   const tip = "tip" in question && typeof question.tip === "string" ? question.tip : undefined;
@@ -156,7 +162,8 @@ export function QuestionForm({
         htmlFor={`explanation-${questionId}`}
         className="text-[11px] font-medium text-foreground"
       >
-        Please explain your rating
+        Please explain your rating{" "}
+        <span className="font-normal text-muted-foreground">(optional)</span>
         {opts?.showQuestionHint && (area || questionCode) ? (
           <span className="font-normal text-muted-foreground">
             {" "}
@@ -225,7 +232,12 @@ export function QuestionForm({
         </div>
 
         <div className="mt-1.5 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between" data-tour="rating">
-          {renderRatingButtons("sm")}
+          <div className="flex flex-col gap-1">
+            <Label className="text-[10px] font-medium text-foreground">
+              Rating {requiredMark}
+            </Label>
+            {renderRatingButtons("sm")}
+          </div>
           <span className="text-[9px] font-medium text-muted-foreground sm:text-right">
             {getRatingLabel(safeResponse.rating)}
           </span>
@@ -277,7 +289,8 @@ export function QuestionForm({
         {question.type === "ranking" ? (
           <div className="space-y-1.5" data-tour="ranking">
             <Label className="text-[11px] font-medium text-foreground">
-              Rank your top {MAX_PRIORITIES} priorities
+              Rank your top {MAX_PRIORITIES} priorities{" "}
+              <span className="font-normal text-muted-foreground">(optional)</span>
             </Label>
             <p className="text-[11px] text-muted-foreground">
               Select categories in order of priority (first selected = highest).
@@ -310,7 +323,8 @@ export function QuestionForm({
         ) : question.type === "text" ? (
           <div className="space-y-1">
             <Label htmlFor="open-response" className="text-[11px] font-medium text-foreground">
-              Your response
+              Your response{" "}
+              <span className="font-normal text-muted-foreground">(optional)</span>
             </Label>
             <Textarea
               id="open-response"
@@ -328,7 +342,9 @@ export function QuestionForm({
             {(parts === "full" || parts === "prompt-rating") && (
               <div className="space-y-2" data-tour="rating">
                 <div className="flex items-center justify-between">
-                  <Label className="text-[11px] text-foreground">Rating</Label>
+                  <Label className="text-[11px] text-foreground">
+                    Rating {requiredMark}
+                  </Label>
                   <span className="text-[11px] font-medium text-muted-foreground">
                     {getRatingLabel(safeResponse.rating)}
                   </span>

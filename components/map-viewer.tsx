@@ -31,7 +31,11 @@ interface MapViewerProps {
   classification: Classification;
   onAddAnnotation: (annotation: Omit<Annotation, "id">) => void;
   onRemoveAnnotation: (id: string) => void;
-  onUpdateAnnotation: (id: string, updates: Partial<Pick<Annotation, "comment">>) => void;
+  onUpdateAnnotation: (
+    id: string,
+    updates: Partial<Pick<Annotation, "comment" | "classification" | "color">>
+  ) => void;
+  onToolChange?: (tool: Tool) => void;
   center?: [number, number];
   zoom?: number;
   annotationsEnabled?: boolean;
@@ -126,6 +130,7 @@ export function MapViewer({
   onAddAnnotation,
   onRemoveAnnotation,
   onUpdateAnnotation,
+  onToolChange,
   center = DEFAULT_CENTER,
   zoom = 16,
   annotationsEnabled = true,
@@ -161,19 +166,26 @@ export function MapViewer({
   const [freeformDrawing, setFreeformDrawing] = useState(false);
   // Pending freeform awaiting a comment: { points }
   const [pendingFreeform, setPendingFreeform] = useState<{ points: LngLat[] } | null>(null);
+  /** Space bar held — temporarily pan instead of starting a freeform draw. */
+  const spaceHeldRef = useRef(false);
 
   // Marker the user tapped in edit mode (to view/edit comment / remove)
   const [activeMarker, setActiveMarker] = useState<Annotation | null>(null);
   const [editComment, setEditComment] = useState("");
+  const [editClassification, setEditClassification] = useState<
+    "strength" | "weakness"
+  >("strength");
 
   const openActiveMarker = (ann: Annotation) => {
     setActiveMarker(ann);
     setEditComment(ann.comment ?? "");
+    setEditClassification(ann.classification);
   };
 
   const closeActiveMarker = () => {
     setActiveMarker(null);
     setEditComment("");
+    setEditClassification("strength");
   };
 
   // keep the latest interaction config in refs so the click handler stays stable
@@ -310,9 +322,35 @@ export function MapViewer({
 
     // Freeform: start drawing on mousedown, capture points while dragging,
     // finalize on mouseup. Disable map panning so the drag draws instead.
+    // Hold Space to pan instead of drawing. Always finish on window mouseup so
+    // dragPan is not left disabled if the pointer is released off the map.
+    const ensureDragPan = () => {
+      if (!map.dragPan.isEnabled()) map.dragPan.enable();
+    };
+
+    const finishFreeform = () => {
+      if (!freeformDrawingRef.current) {
+        ensureDragPan();
+        return;
+      }
+      freeformDrawingRef.current = false;
+      ensureDragPan();
+      setFreeformDrawing(false);
+      const points = freeformPointsRef.current;
+      freeformPointsRef.current = [];
+      const src = map.getSource("freeform-preview") as mapboxgl.GeoJSONSource;
+      src?.setData({ type: "FeatureCollection", features: [] });
+      if (points.length > 2) {
+        setPendingFreeform({ points });
+        setPendingComment("");
+      }
+    };
+
     map.on("mousedown", (e) => {
       if (readOnly || !enabledRef.current) return;
       if (toolRef.current !== "freeform") return;
+      // Space = temporary pan mode (don't begin a draw).
+      if (spaceHeldRef.current || e.originalEvent.button !== 0) return;
       e.preventDefault();
       map.dragPan.disable();
       freeformDrawingRef.current = true;
@@ -335,30 +373,72 @@ export function MapViewer({
       });
     });
 
-    const finishFreeform = () => {
-      if (!freeformDrawingRef.current) return;
-      freeformDrawingRef.current = false;
-      map.dragPan.enable();
-      setFreeformDrawing(false);
-      const points = freeformPointsRef.current;
-      freeformPointsRef.current = [];
-      const src = map.getSource("freeform-preview") as mapboxgl.GeoJSONSource;
-      src?.setData({ type: "FeatureCollection", features: [] });
-      if (points.length > 2) {
-        setPendingFreeform({ points });
-        setPendingComment("");
-      }
-    };
-    map.on("mouseup", finishFreeform);
+    window.addEventListener("mouseup", finishFreeform);
+    window.addEventListener("touchend", finishFreeform);
 
     mapRef.current = map;
 
     return () => {
+      window.removeEventListener("mouseup", finishFreeform);
+      window.removeEventListener("touchend", finishFreeform);
       map.remove();
       mapRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasToken]);
+
+  // Keep drag-pan available whenever we are not actively freeform-drawing.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
+    if (tool !== "freeform" || !freeformDrawing) {
+      if (!freeformDrawingRef.current && !map.dragPan.isEnabled()) {
+        map.dragPan.enable();
+      }
+    }
+  }, [tool, freeformDrawing, mapLoaded, annotationsEnabled]);
+
+  // Space = pan while Draw tool is selected (and cancel an in-progress draw).
+  useEffect(() => {
+    const isSpace = (e: KeyboardEvent) =>
+      e.code === "Space" || e.key === " " || e.key === "Spacebar";
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isSpace(e)) return;
+      // Avoid page scroll while using Space-to-pan over the map.
+      if (toolRef.current === "freeform") e.preventDefault();
+      spaceHeldRef.current = true;
+      const map = mapRef.current;
+      if (!map) return;
+      if (freeformDrawingRef.current) {
+        freeformDrawingRef.current = false;
+        freeformPointsRef.current = [];
+        setFreeformDrawing(false);
+        const src = map.getSource("freeform-preview") as mapboxgl.GeoJSONSource;
+        src?.setData({ type: "FeatureCollection", features: [] });
+      }
+      if (!map.dragPan.isEnabled()) map.dragPan.enable();
+    };
+
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (!isSpace(e)) return;
+      spaceHeldRef.current = false;
+    };
+
+    const clearSpace = () => {
+      spaceHeldRef.current = false;
+    };
+
+    window.addEventListener("keydown", onKeyDown, { passive: false });
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", clearSpace);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", clearSpace);
+      spaceHeldRef.current = false;
+    };
+  }, []);
 
   // Update cursor based on tool
   useEffect(() => {
@@ -370,14 +450,26 @@ export function MapViewer({
       !readOnly && annotationsEnabled && drawable ? "crosshair" : "";
   }, [tool, annotationsEnabled, readOnly, mapLoaded]);
 
-  // Cancel an in-progress circle with Escape
+  // Cancel an in-progress circle with Escape; also restore drag-pan.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
+      const map = mapRef.current;
+      if (map && !map.dragPan.isEnabled()) map.dragPan.enable();
+
+      if (freeformDrawingRef.current) {
+        freeformDrawingRef.current = false;
+        freeformPointsRef.current = [];
+        setFreeformDrawing(false);
+        const src = map?.getSource("freeform-preview") as
+          | mapboxgl.GeoJSONSource
+          | undefined;
+        src?.setData({ type: "FeatureCollection", features: [] });
+      }
+
       if (!circleCenterRef.current) return;
       circleCenterRef.current = null;
       setCircleDrawing(false);
-      const map = mapRef.current;
       const src = map?.getSource("circle-preview") as mapboxgl.GeoJSONSource | undefined;
       src?.setData({ type: "FeatureCollection", features: [] });
     };
@@ -597,6 +689,7 @@ export function MapViewer({
       });
       setPendingFreeform(null);
       setPendingComment("");
+      onToolChange?.("pan");
       return;
     }
     if (pendingCircle) {
@@ -613,6 +706,7 @@ export function MapViewer({
       });
       setPendingCircle(null);
       setPendingComment("");
+      onToolChange?.("pan");
       return;
     }
     if (!pendingLngLat) return;
@@ -628,6 +722,7 @@ export function MapViewer({
     });
     setPendingLngLat(null);
     setPendingComment("");
+    onToolChange?.("pan");
   };
 
   const handleCancelAnnotation = () => {
@@ -635,6 +730,9 @@ export function MapViewer({
     setPendingCircle(null);
     setPendingFreeform(null);
     setPendingComment("");
+    const map = mapRef.current;
+    if (map && !map.dragPan.isEnabled()) map.dragPan.enable();
+    onToolChange?.("pan");
   };
 
   if (!hasToken) {
@@ -689,6 +787,16 @@ export function MapViewer({
           Streets
         </button>
       </div>
+
+      {!readOnly && annotationsEnabled && tool === "freeform" && (
+        <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 max-w-[min(24rem,calc(100%-1.5rem))] -translate-x-1/2 rounded-lg border border-border/70 bg-card/95 px-3 py-1.5 text-center text-[10px] text-muted-foreground shadow-sm backdrop-blur-sm">
+          Drag to draw · Hold{" "}
+          <kbd className="rounded border border-border bg-muted px-1 font-medium text-foreground">
+            Space
+          </kbd>{" "}
+          and drag to pan
+        </div>
+      )}
 
       {/* Circle drawing hint */}
       {circleDrawing && (
@@ -792,7 +900,7 @@ export function MapViewer({
               <div className="flex min-w-0 items-center gap-2">
                 <span
                   className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
-                    activeMarker.classification === "strength"
+                    editClassification === "strength"
                       ? "bg-emerald-600"
                       : "bg-rose-600"
                   }`}
@@ -803,17 +911,6 @@ export function MapViewer({
                   <p className="truncate text-sm font-medium text-foreground">
                     {questionCategoryLabel(activeMarker.questionId)}
                   </p>
-                  <span
-                    className={`text-sm font-medium ${
-                      activeMarker.classification === "strength"
-                        ? "text-emerald-700"
-                        : "text-rose-700"
-                    }`}
-                  >
-                    {activeMarker.classification === "strength"
-                      ? "Strength"
-                      : "Area of Concern"}
-                  </span>
                 </div>
               </div>
               <Button
@@ -824,6 +921,39 @@ export function MapViewer({
               >
                 <X className="h-3 w-3" />
               </Button>
+            </div>
+            <div className="mb-3">
+              <p className="mb-1.5 text-xs font-medium text-muted-foreground">
+                Mark as
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={editClassification === "strength" ? "default" : "outline"}
+                  className={
+                    editClassification === "strength"
+                      ? "border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
+                      : undefined
+                  }
+                  onClick={() => setEditClassification("strength")}
+                >
+                  Strength
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={editClassification === "weakness" ? "default" : "outline"}
+                  className={
+                    editClassification === "weakness"
+                      ? "border-rose-600 bg-rose-600 text-white hover:bg-rose-700"
+                      : undefined
+                  }
+                  onClick={() => setEditClassification("weakness")}
+                >
+                  Challenge
+                </Button>
+              </div>
             </div>
             <textarea
               value={editComment}
@@ -851,6 +981,11 @@ export function MapViewer({
                   onClick={() => {
                     onUpdateAnnotation(activeMarker.id, {
                       comment: editComment.trim(),
+                      classification: editClassification,
+                      color:
+                        editClassification === "strength"
+                          ? "#059669"
+                          : "#dc2626",
                     });
                     closeActiveMarker();
                   }}

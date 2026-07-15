@@ -93,6 +93,10 @@ function responseHasContent(response: QuestionResponse): boolean {
   return false;
 }
 
+export function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+}
+
 function validateSubmissionPayload(payload: SurveySubmissionPayload): string | null {
   if (!payload.school?.trim()) return "School is required.";
   if (payload.role !== "school_leader" && payload.role !== "operations") {
@@ -101,7 +105,7 @@ function validateSubmissionPayload(payload: SurveySubmissionPayload): string | n
   if (!payload.principalName?.trim()) return "Name is required.";
   if (!payload.positionTitle?.trim()) return "Position title is required.";
   if (!payload.email?.trim()) return "Email is required.";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email.trim())) {
+  if (!isValidEmail(payload.email)) {
     return "A valid email address is required.";
   }
   if (!Array.isArray(payload.responses)) return "Responses are missing.";
