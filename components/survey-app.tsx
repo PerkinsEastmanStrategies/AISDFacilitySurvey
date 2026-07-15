@@ -64,6 +64,7 @@ import {
   type ManifestSchoolOption,
 } from "@/lib/floor-plan-manifest";
 import { isValidEmail, type SurveySubmissionPayload } from "@/lib/submit-survey";
+import { isDeferredSurveySchool } from "@/lib/deferred-survey-schools";
 import Image from "next/image";
 
 type Step = SurveyStep;
@@ -676,6 +677,7 @@ export default function SurveyApp({
     if (step === "intro") {
       return Boolean(
         surveyData.school &&
+          !isDeferredSurveySchool(surveyData.school) &&
           surveyData.role &&
           surveyData.positionTitle.trim() &&
           surveyData.principalName.trim() &&

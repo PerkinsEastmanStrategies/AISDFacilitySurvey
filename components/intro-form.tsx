@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -18,6 +20,10 @@ import {
 } from "@/lib/floor-plan-manifest";
 import type { SurveyRole } from "@/lib/survey-data";
 import { isValidEmail } from "@/lib/submit-survey";
+import {
+  getDeferredSurveyNotice,
+  type DeferredSurveyNotice,
+} from "@/lib/deferred-survey-schools";
 
 interface SchoolInfo {
   school: string;
@@ -45,6 +51,11 @@ export function IntroForm({
   const [manifestSchools, setManifestSchools] = useState<
     ManifestSchoolOption[] | null
   >(initialSchools.length > 0 ? initialSchools : null);
+  const [deferredNotice, setDeferredNotice] =
+    useState<DeferredSurveyNotice | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => setPortalReady(true), []);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +98,15 @@ export function IntroForm({
         : null;
 
   const handleChange = (field: keyof SchoolInfo, value: string) => {
+    if (field === "school") {
+      const notice = getDeferredSurveyNotice(value);
+      if (notice) {
+        setDeferredNotice(notice);
+        // Do not keep a deferred campus selected — they cannot take the survey yet.
+        onChange({ ...data, school: "" });
+        return;
+      }
+    }
     onChange({ ...data, [field]: value });
   };
 
@@ -99,7 +119,10 @@ export function IntroForm({
     </span>
   );
 
+  const dismissDeferredNotice = () => setDeferredNotice(null);
+
   return (
+    <>
     <Card className="gap-2 border-border/60 py-2.5 shadow-sm">
       <CardHeader className="px-2.5 pb-1.5">
         <CardTitle className="font-heading text-sm font-bold text-foreground">School Information</CardTitle>
@@ -291,5 +314,47 @@ export function IntroForm({
         )}
       </CardContent>
     </Card>
+
+    {portalReady &&
+      deferredNotice &&
+      createPortal(
+        <div
+          className="fixed inset-0 z-[120] flex items-end justify-center p-3 sm:items-center sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="deferred-survey-title"
+        >
+          <div
+            className="absolute inset-0 bg-slate-900/70 backdrop-blur-sm"
+            onClick={dismissDeferredNotice}
+            aria-hidden="true"
+          />
+          <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+            <div className="space-y-3 px-5 py-5 sm:px-6 sm:py-6">
+              <p className="text-sm font-medium text-foreground">
+                Thank you for your interest in the Facility Suitability and
+                Condition Survey.
+              </p>
+              <h2
+                id="deferred-survey-title"
+                className="font-heading text-lg font-bold underline decoration-2 underline-offset-4 text-foreground"
+              >
+                {deferredNotice.title}
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground">Note:</span>{" "}
+                {deferredNotice.note}
+              </p>
+            </div>
+            <div className="border-t border-border/60 bg-muted/20 px-5 py-3 sm:px-6 sm:py-4">
+              <Button className="w-full" onClick={dismissDeferredNotice}>
+                Got it!
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
   );
 }

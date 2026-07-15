@@ -125,6 +125,8 @@ export function FloorPlanViewer({
   const [isDrawing, setIsDrawing] = useState(false);
   const [drawingPoints, setDrawingPoints] = useState<{ x: number; y: number }[]>([]);
   const [circleStart, setCircleStart] = useState<{ x: number; y: number } | null>(null);
+  /** Circle center while dragging (midpoint of diameter from edge to edge). */
+  const [circleCenter, setCircleCenter] = useState<{ x: number; y: number } | null>(null);
   const [circleRadius, setCircleRadius] = useState(0);
   const [pendingComment, setPendingComment] = useState("");
   const [showCommentInput, setShowCommentInput] = useState(false);
@@ -467,8 +469,11 @@ export function FloorPlanViewer({
       });
       setShowCommentInput(true);
     } else if (tool === "circle") {
+      // First press = a point on the circle edge; drag to the opposite edge.
       const coords = getEventSvgCoords(e.clientX, e.clientY);
       setCircleStart(coords);
+      setCircleCenter(coords);
+      setCircleRadius(0);
       setIsDrawing(true);
     } else if (tool === "freeform") {
       const coords = getEventSvgCoords(e.clientX, e.clientY);
@@ -485,9 +490,13 @@ export function FloorPlanViewer({
       });
     } else if (isDrawing && tool === "circle" && circleStart) {
       const coords = getEventSvgCoords(e.clientX, e.clientY);
-      const radius = Math.sqrt(
-        Math.pow(coords.x - circleStart.x, 2) + Math.pow(coords.y - circleStart.y, 2)
-      );
+      const center = {
+        x: (circleStart.x + coords.x) / 2,
+        y: (circleStart.y + coords.y) / 2,
+      };
+      const radius =
+        Math.hypot(coords.x - circleStart.x, coords.y - circleStart.y) / 2;
+      setCircleCenter(center);
       setCircleRadius(radius);
     } else if (isDrawing && tool === "freeform") {
       const coords = getEventSvgCoords(e.clientX, e.clientY);
@@ -498,31 +507,34 @@ export function FloorPlanViewer({
   const handleMouseUp = () => {
     if (isPanning) {
       setIsPanning(false);
-    } else if (isDrawing && tool === "circle" && circleStart) {
+    } else if (isDrawing && tool === "circle" && circleStart && circleCenter) {
       const roomsInShape =
         circleRadius > 0
           ? getRoomsInDrawnShape({
               type: "circle",
-              x: circleStart.x,
-              y: circleStart.y,
+              x: circleCenter.x,
+              y: circleCenter.y,
               radius: circleRadius,
             })
           : [];
 
-      setPendingAnnotation({
-        questionId: currentQuestionId,
-        type: "circle",
-        x: circleStart.x,
-        y: circleStart.y,
-        radius: circleRadius,
-        classification,
-        color: currentColor,
-        floorKey: activeFloorId,
-        roomsInShape: toRoomsInShapeField(roomsInShape),
-      });
-      setShowCommentInput(true);
+      if (circleRadius > 0) {
+        setPendingAnnotation({
+          questionId: currentQuestionId,
+          type: "circle",
+          x: circleCenter.x,
+          y: circleCenter.y,
+          radius: circleRadius,
+          classification,
+          color: currentColor,
+          floorKey: activeFloorId,
+          roomsInShape: toRoomsInShapeField(roomsInShape),
+        });
+        setShowCommentInput(true);
+      }
       setIsDrawing(false);
       setCircleStart(null);
+      setCircleCenter(null);
       setCircleRadius(0);
     } else if (isDrawing && tool === "freeform" && drawingPoints.length > 2) {
       const bounds = drawingPoints.reduce(
@@ -600,6 +612,7 @@ export function FloorPlanViewer({
     clearSvgRoomHighlight();
     setDrawingPoints([]);
     setCircleStart(null);
+    setCircleCenter(null);
     setCircleRadius(0);
   };
 
@@ -950,8 +963,8 @@ export function FloorPlanViewer({
   const renderDrawingPreview = () => {
     if (!isDrawing || !viewBox) return null;
     
-    if (tool === "circle" && circleStart) {
-      const center = svgToScreen(circleStart.x, circleStart.y);
+    if (tool === "circle" && circleCenter && circleRadius > 0) {
+      const center = svgToScreen(circleCenter.x, circleCenter.y);
       const radiusScreen = circleRadius * zoom;
       const isStrength = classification === "strength";
       return (
