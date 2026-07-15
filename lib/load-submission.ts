@@ -23,6 +23,7 @@ interface DbSubmissionRow {
   school_description: string | null;
   unique_features: string | null;
   community_partners: string | null;
+  position_title: string | null;
   raw_payload: Omit<SurveyData, "svgContent"> | null;
 }
 
@@ -114,6 +115,8 @@ export async function loadSurveySubmission(
       meta,
       data: {
         ...row.raw_payload,
+        positionTitle:
+          row.raw_payload.positionTitle ?? row.position_title ?? "",
         svgContent: null,
       },
     };
@@ -192,6 +195,7 @@ export async function loadSurveySubmission(
     data: {
       school: row.school,
       role: row.role as SurveyData["role"],
+      positionTitle: row.position_title ?? "",
       principalName: row.respondent_name,
       email: row.email,
       schoolDescription: row.school_description ?? "",

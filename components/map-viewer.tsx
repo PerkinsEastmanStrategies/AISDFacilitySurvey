@@ -31,6 +31,7 @@ interface MapViewerProps {
   classification: Classification;
   onAddAnnotation: (annotation: Omit<Annotation, "id">) => void;
   onRemoveAnnotation: (id: string) => void;
+  onUpdateAnnotation: (id: string, updates: Partial<Pick<Annotation, "comment">>) => void;
   center?: [number, number];
   zoom?: number;
   annotationsEnabled?: boolean;
@@ -124,6 +125,7 @@ export function MapViewer({
   classification,
   onAddAnnotation,
   onRemoveAnnotation,
+  onUpdateAnnotation,
   center = DEFAULT_CENTER,
   zoom = 16,
   annotationsEnabled = true,
@@ -160,18 +162,33 @@ export function MapViewer({
   // Pending freeform awaiting a comment: { points }
   const [pendingFreeform, setPendingFreeform] = useState<{ points: LngLat[] } | null>(null);
 
-  // Marker the user tapped in edit mode (to view comment / remove)
+  // Marker the user tapped in edit mode (to view/edit comment / remove)
   const [activeMarker, setActiveMarker] = useState<Annotation | null>(null);
+  const [editComment, setEditComment] = useState("");
+
+  const openActiveMarker = (ann: Annotation) => {
+    setActiveMarker(ann);
+    setEditComment(ann.comment ?? "");
+  };
+
+  const closeActiveMarker = () => {
+    setActiveMarker(null);
+    setEditComment("");
+  };
 
   // keep the latest interaction config in refs so the click handler stays stable
   const toolRef = useRef(tool);
   const classificationRef = useRef(classification);
   const enabledRef = useRef(annotationsEnabled);
   const questionRef = useRef(currentQuestionId);
+  const annotationsRef = useRef(annotations);
+  const readOnlyRef = useRef(readOnly);
   toolRef.current = tool;
   classificationRef.current = classification;
   enabledRef.current = annotationsEnabled;
   questionRef.current = currentQuestionId;
+  annotationsRef.current = annotations;
+  readOnlyRef.current = readOnly;
 
   // Initialize map once
   useEffect(() => {
@@ -460,12 +477,12 @@ export function MapViewer({
           paint: { "line-color": ["get", "color"], "line-width": 2 },
         });
         map.on("click", "circles-fill", (e) => {
-          if (readOnly) return;
           const fid = e.features?.[0]?.properties?.id as string | undefined;
-          const ann = annotations.find((x) => x.id === fid);
+          const ann = annotationsRef.current.find((x) => x.id === fid);
           if (ann) {
             e.preventDefault();
-            setActiveMarker(ann);
+            if (readOnlyRef.current) setSelectedAnnotation(ann);
+            else openActiveMarker(ann);
           }
         });
       } else {
@@ -510,12 +527,12 @@ export function MapViewer({
           paint: { "line-color": ["get", "color"], "line-width": 2 },
         });
         map.on("click", "freeforms-fill", (e) => {
-          if (readOnly) return;
           const fid = e.features?.[0]?.properties?.id as string | undefined;
-          const ann = annotations.find((x) => x.id === fid);
+          const ann = annotationsRef.current.find((x) => x.id === fid);
           if (ann) {
             e.preventDefault();
-            setActiveMarker(ann);
+            if (readOnlyRef.current) setSelectedAnnotation(ann);
+            else openActiveMarker(ann);
           }
         });
       } else {
@@ -549,7 +566,7 @@ export function MapViewer({
         if (readOnly) {
           setSelectedAnnotation(a);
         } else {
-          setActiveMarker(a);
+          openActiveMarker(a);
         }
       });
 
@@ -767,14 +784,14 @@ export function MapViewer({
         </div>
       )}
 
-      {/* Active marker popover (edit mode): view comment / remove */}
+      {/* Active marker dialog (edit mode): edit comment / remove */}
       {!readOnly && activeMarker && (
         <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
             <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <span
-                  className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white ${
+                  className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
                     activeMarker.classification === "strength"
                       ? "bg-emerald-600"
                       : "bg-rose-600"
@@ -782,43 +799,65 @@ export function MapViewer({
                 >
                   {activeMarker.questionId}
                 </span>
-                <span
-                  className={`text-sm font-medium ${
-                    activeMarker.classification === "strength"
-                      ? "text-emerald-700"
-                      : "text-rose-700"
-                  }`}
-                >
-                  {activeMarker.classification === "strength"
-                    ? "Strength"
-                    : "Area of Concern"}
-                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {questionCategoryLabel(activeMarker.questionId)}
+                  </p>
+                  <span
+                    className={`text-sm font-medium ${
+                      activeMarker.classification === "strength"
+                        ? "text-emerald-700"
+                        : "text-rose-700"
+                    }`}
+                  >
+                    {activeMarker.classification === "strength"
+                      ? "Strength"
+                      : "Area of Concern"}
+                  </span>
+                </div>
               </div>
               <Button
                 variant="ghost"
                 size="sm"
                 className="h-6 w-6 p-0"
-                onClick={() => setActiveMarker(null)}
+                onClick={closeActiveMarker}
               >
                 <X className="h-3 w-3" />
               </Button>
             </div>
-            {activeMarker.comment ? (
-              <p className="text-sm text-foreground">{activeMarker.comment}</p>
-            ) : (
-              <p className="text-sm italic text-muted-foreground">No comment provided</p>
-            )}
-            <div className="mt-4 flex justify-end gap-2">
+            <textarea
+              value={editComment}
+              onChange={(e) => setEditComment(e.target.value)}
+              placeholder="Add or edit a comment..."
+              className="w-full resize-none rounded-lg border border-border bg-muted/45 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
+              rows={3}
+              autoFocus
+            />
+            <div className="mt-4 flex items-center justify-between gap-2">
               <Button
-                variant="outline"
+                variant="destructive"
                 onClick={() => {
                   onRemoveAnnotation(activeMarker.id);
-                  setActiveMarker(null);
+                  closeActiveMarker();
                 }}
               >
-                Remove Pin
+                Delete
               </Button>
-              <Button onClick={() => setActiveMarker(null)}>Done</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={closeActiveMarker}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    onUpdateAnnotation(activeMarker.id, {
+                      comment: editComment.trim(),
+                    });
+                    closeActiveMarker();
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
             </div>
           </div>
         </div>

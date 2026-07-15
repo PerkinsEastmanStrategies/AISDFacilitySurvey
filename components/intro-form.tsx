@@ -21,6 +21,7 @@ import type { SurveyRole } from "@/lib/survey-data";
 interface SchoolInfo {
   school: string;
   role: SurveyRole | "";
+  positionTitle: string;
   principalName: string;
   email: string;
   schoolDescription: string;
@@ -177,6 +178,29 @@ export function IntroForm({
               Assessment questions.
             </p>
           )}
+        </div>
+
+        <div className="space-y-1" data-tour="position-title">
+          <Label
+            htmlFor="positionTitle"
+            className="text-[11px] font-semibold text-foreground"
+          >
+            Position Title
+          </Label>
+          <Input
+            id="positionTitle"
+            value={data.positionTitle}
+            onChange={(e) => handleChange("positionTitle", e.target.value)}
+            disabled={!data.role}
+            placeholder={
+              !data.role
+                ? "Select a role first..."
+                : isOperations
+                  ? "e.g. Facility Manager, Custodial Supervisor"
+                  : "e.g. Principal, Assistant Principal"
+            }
+            className="h-7 text-xs md:text-xs"
+          />
         </div>
 
         <div className="grid gap-2.5 sm:grid-cols-2">

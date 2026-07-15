@@ -762,6 +762,7 @@ export function ReportView({
                     classification="strength"
                     onAddAnnotation={() => {}}
                     onRemoveAnnotation={() => {}}
+                    onUpdateAnnotation={() => {}}
                     onToolChange={() => {}}
                     filterQuestionId={
                       filterQuestion === "all" ? null : parseInt(filterQuestion)
@@ -810,6 +811,7 @@ export function ReportView({
                     classification="strength"
                     onAddAnnotation={() => {}}
                     onRemoveAnnotation={() => {}}
+                    onUpdateAnnotation={() => {}}
                     annotationsEnabled={false}
                     readOnly={true}
                     focusLocation={selectedSchool?.coordinates ?? null}
@@ -914,11 +916,18 @@ export function ReportView({
                   <div className="rounded-lg bg-muted/50 p-4">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <User className="h-4 w-4" />
-                      <span className="text-sm font-medium">Principal</span>
+                      <span className="text-sm font-medium">Name</span>
                     </div>
                     <p className="text-foreground">{data.principalName || "Not specified"}</p>
                   </div>
-                  <div className="rounded-lg bg-muted/50 p-4 md:col-span-2">
+                  <div className="rounded-lg bg-muted/50 p-4">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                      <User className="h-4 w-4" />
+                      <span className="text-sm font-medium">Position Title</span>
+                    </div>
+                    <p className="text-foreground">{data.positionTitle || "Not specified"}</p>
+                  </div>
+                  <div className="rounded-lg bg-muted/50 p-4">
                     <div className="flex items-center gap-2 text-muted-foreground mb-1">
                       <Mail className="h-4 w-4" />
                       <span className="text-sm font-medium">Email</span>

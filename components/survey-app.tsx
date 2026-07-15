@@ -164,6 +164,7 @@ export default function SurveyApp({
   const [surveyData, setSurveyData] = useState<SurveyData>({
     school: "",
     role: "",
+    positionTitle: "",
     principalName: "",
     email: "",
     schoolDescription: "",
@@ -185,6 +186,7 @@ export default function SurveyApp({
       setActiveFloorId(draft.activeFloorId);
       setSurveyData((prev) => ({
         ...draft.surveyData,
+        positionTitle: draft.surveyData.positionTitle ?? "",
         // Fill any questions added after the draft was saved (P6/P7, etc.).
         responses: mergeSurveyResponses(draft.surveyData.responses),
         svgContent: prev.svgContent,
@@ -508,6 +510,18 @@ export default function SurveyApp({
     }));
   };
 
+  const handleUpdateAnnotation = (
+    id: string,
+    updates: Partial<Pick<Annotation, "comment">>
+  ) => {
+    setSurveyData((prev) => ({
+      ...prev,
+      annotations: prev.annotations.map((a) =>
+        a.id === id ? { ...a, ...updates } : a
+      ),
+    }));
+  };
+
   const questionTourSteps = useMemo(
     () => getQuestionTourSteps(availableFloors.length),
     [availableFloors.length]
@@ -619,7 +633,13 @@ export default function SurveyApp({
 
   const canProceed = () => {
     if (step === "intro") {
-      return surveyData.school && surveyData.role && surveyData.principalName && surveyData.email;
+      return (
+        surveyData.school &&
+        surveyData.role &&
+        surveyData.positionTitle.trim() &&
+        surveyData.principalName &&
+        surveyData.email
+      );
     }
     if (step === "questions") {
       // Ranking, open-ended text, and space-location questions have a valid
@@ -700,6 +720,7 @@ export default function SurveyApp({
         classification={annotationClassification}
         onAddAnnotation={handleAddAnnotation}
         onRemoveAnnotation={handleRemoveAnnotation}
+        onUpdateAnnotation={handleUpdateAnnotation}
         onToolChange={setAnnotationTool}
         annotationsEnabled={annotationsEnabledForViewer}
         spaceLabels={spaceLabels}
@@ -723,6 +744,7 @@ export default function SurveyApp({
         classification={annotationClassification}
         onAddAnnotation={handleAddAnnotation}
         onRemoveAnnotation={handleRemoveAnnotation}
+        onUpdateAnnotation={handleUpdateAnnotation}
         annotationsEnabled={annotationsEnabledForViewer}
         focusLocation={selectedSchool?.coordinates ?? null}
         focusLabel={selectedSchool?.buildingName ?? null}
@@ -971,6 +993,7 @@ export default function SurveyApp({
                     data={{
                       school: surveyData.school,
                       role: surveyData.role,
+                      positionTitle: surveyData.positionTitle,
                       principalName: surveyData.principalName,
                       email: surveyData.email,
                       schoolDescription: surveyData.schoolDescription,

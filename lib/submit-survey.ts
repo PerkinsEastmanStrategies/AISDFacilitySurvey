@@ -99,6 +99,7 @@ function validateSubmissionPayload(payload: SurveySubmissionPayload): string | n
     return "Role is required.";
   }
   if (!payload.principalName?.trim()) return "Name is required.";
+  if (!payload.positionTitle?.trim()) return "Position title is required.";
   if (!payload.email?.trim()) return "Email is required.";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email.trim())) {
     return "A valid email address is required.";
@@ -154,6 +155,7 @@ export async function submitSurveyToSupabase(
       role: payload.role as SurveyRole,
       respondent_name: payload.principalName.trim(),
       email: payload.email.trim(),
+      position_title: payload.positionTitle?.trim() || null,
       school_description: payload.schoolDescription?.trim() || null,
       unique_features: payload.uniqueFeatures?.trim() || null,
       community_partners: payload.specialEducation?.trim() || null,

@@ -752,6 +752,8 @@ export type SurveyRole = "school_leader" | "operations";
 export interface SurveyData {
   school: string;
   role: SurveyRole | "";
+  /** Free-text job title (e.g. Principal, Assistant Principal, Facility Manager). */
+  positionTitle: string;
   principalName: string;
   email: string;
   schoolDescription: string;

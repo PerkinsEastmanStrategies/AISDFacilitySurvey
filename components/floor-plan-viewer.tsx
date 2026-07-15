@@ -61,6 +61,7 @@ interface FloorPlanViewerProps {
   classification: Classification;
   onAddAnnotation: (annotation: Omit<Annotation, "id">) => void;
   onRemoveAnnotation: (id: string) => void;
+  onUpdateAnnotation: (id: string, updates: Partial<Pick<Annotation, "comment">>) => void;
   onToolChange: (tool: Tool) => void;
   filterQuestionId?: number | null;
   filterQuestionIds?: number[] | null;
@@ -93,6 +94,7 @@ export function FloorPlanViewer({
   classification,
   onAddAnnotation,
   onRemoveAnnotation,
+  onUpdateAnnotation,
   onToolChange,
   filterQuestionId,
   filterQuestionIds,
@@ -126,6 +128,7 @@ export function FloorPlanViewer({
   const [pendingAnnotation, setPendingAnnotation] = useState<Omit<Annotation, "id" | "comment"> | null>(null);
   const [highlightPolygon, setHighlightPolygon] = useState<{ x: number; y: number }[] | null>(null);
   const [selectedAnnotation, setSelectedAnnotation] = useState<Annotation | null>(null);
+  const [editComment, setEditComment] = useState("");
   const [viewBox, setViewBox] = useState<ViewBox | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   /** Bumps when a new SVG should be mounted into the host (avoids keeping a second full SVG string in React state). */
@@ -664,13 +667,61 @@ export function FloorPlanViewer({
 
   const handleAnnotationClick = (annotation: Annotation, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (readOnly) {
-      // In read-only mode (report view), show comment popover
-      setSelectedAnnotation(annotation);
-    } else {
-      // In edit mode, remove the annotation
-      onRemoveAnnotation(annotation.id);
-    }
+    setSelectedAnnotation(annotation);
+    setEditComment(annotation.comment ?? "");
+  };
+
+  const closeAnnotationPopover = () => {
+    setSelectedAnnotation(null);
+    setEditComment("");
+  };
+
+  const saveSelectedAnnotationComment = () => {
+    if (!selectedAnnotation) return;
+    onUpdateAnnotation(selectedAnnotation.id, { comment: editComment.trim() });
+    closeAnnotationPopover();
+  };
+
+  const deleteSelectedAnnotation = () => {
+    if (!selectedAnnotation) return;
+    onRemoveAnnotation(selectedAnnotation.id);
+    closeAnnotationPopover();
+  };
+
+  const renderAnnotationPopoverBody = (annotation: Annotation) => {
+    const isStrength = annotation.classification === "strength";
+    return (
+      <div className="p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-foreground">
+              {questionCategoryLabel(annotation.questionId)}
+            </p>
+            <span
+              className={`text-sm font-medium ${
+                isStrength ? "text-emerald-700" : "text-rose-700"
+              }`}
+            >
+              {isStrength ? "Strength" : "Challenge"}
+            </span>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 shrink-0 p-0"
+            onClick={closeAnnotationPopover}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+        {renderAnnotationRoomContext(annotation)}
+        {annotation.comment ? (
+          <p className="text-sm text-foreground">{annotation.comment}</p>
+        ) : (
+          <p className="text-sm italic text-muted-foreground">No comment provided</p>
+        )}
+      </div>
+    );
   };
 
   // Render a pin annotation
@@ -679,7 +730,7 @@ export function FloorPlanViewer({
     const size = 28;
     const isStrength = annotation.classification === "strength";
     const isSelected = selectedAnnotation?.id === annotation.id;
-    
+
     const pinElement = (
       <div
         className={`absolute pointer-events-auto cursor-pointer group ${isSelected ? "z-10" : ""}`}
@@ -690,7 +741,7 @@ export function FloorPlanViewer({
           height: size,
         }}
         onClick={(e) => handleAnnotationClick(annotation, e)}
-        title={readOnly ? "Click to view comment" : `Q${annotation.questionId} - Click to remove`}
+        title={readOnly ? "Click to view comment" : "Click to edit or delete"}
       >
         <div
           className={`w-full h-full flex items-center justify-center text-white text-xs font-bold shadow-lg transition-transform group-hover:scale-110 ${isSelected ? "scale-125 ring-2 ring-white ring-offset-2" : ""}`}
@@ -704,40 +755,22 @@ export function FloorPlanViewer({
         </div>
       </div>
     );
-    
+
     if (readOnly) {
       return (
-        <Popover key={annotation.id} open={isSelected} onOpenChange={(open) => !open && setSelectedAnnotation(null)}>
-          <PopoverTrigger asChild>
-            {pinElement}
-          </PopoverTrigger>
+        <Popover
+          key={annotation.id}
+          open={isSelected}
+          onOpenChange={(open) => !open && closeAnnotationPopover()}
+        >
+          <PopoverTrigger asChild>{pinElement}</PopoverTrigger>
           <PopoverContent className="w-72 p-0" side="top" sideOffset={8}>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {questionCategoryLabel(annotation.questionId)}
-                  </p>
-                  <span className={`text-sm font-medium ${isStrength ? "text-emerald-700" : "text-rose-700"}`}>
-                    {isStrength ? "Strength" : "Challenge"}
-                  </span>
-                </div>
-                <Button variant="ghost" size="sm" className="h-6 w-6 shrink-0 p-0" onClick={() => setSelectedAnnotation(null)}>
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-              {renderAnnotationRoomContext(annotation)}
-              {annotation.comment ? (
-                <p className="text-sm text-foreground">{annotation.comment}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">No comment provided</p>
-              )}
-            </div>
+            {renderAnnotationPopoverBody(annotation)}
           </PopoverContent>
         </Popover>
       );
     }
-    
+
     return <div key={annotation.id}>{pinElement}</div>;
   };
 
@@ -748,7 +781,7 @@ export function FloorPlanViewer({
     const radiusScreen = annotation.radius * zoom;
     const isStrength = annotation.classification === "strength";
     const isSelected = selectedAnnotation?.id === annotation.id;
-    
+
     const circleElement = (
       <div
         className={`absolute pointer-events-auto cursor-pointer ${isSelected ? "z-10" : ""}`}
@@ -759,7 +792,7 @@ export function FloorPlanViewer({
           height: radiusScreen * 2,
         }}
         onClick={(e) => handleAnnotationClick(annotation, e)}
-        title={readOnly ? "Click to view comment" : `Q${annotation.questionId} - Click to remove`}
+        title={readOnly ? "Click to view comment" : "Click to edit or delete"}
       >
         <svg className="w-full h-full" viewBox="0 0 100 100">
           <circle
@@ -785,69 +818,51 @@ export function FloorPlanViewer({
         </svg>
       </div>
     );
-    
+
     if (readOnly) {
       return (
-        <Popover key={annotation.id} open={isSelected} onOpenChange={(open) => !open && setSelectedAnnotation(null)}>
-          <PopoverTrigger asChild>
-            {circleElement}
-          </PopoverTrigger>
+        <Popover
+          key={annotation.id}
+          open={isSelected}
+          onOpenChange={(open) => !open && closeAnnotationPopover()}
+        >
+          <PopoverTrigger asChild>{circleElement}</PopoverTrigger>
           <PopoverContent className="w-72 p-0" side="top" sideOffset={8}>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {questionCategoryLabel(annotation.questionId)}
-                  </p>
-                  <span className={`text-sm font-medium ${isStrength ? "text-emerald-700" : "text-rose-700"}`}>
-                    {isStrength ? "Strength" : "Challenge"}
-                  </span>
-                </div>
-                <Button variant="ghost" size="sm" className="h-6 w-6 shrink-0 p-0" onClick={() => setSelectedAnnotation(null)}>
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-              {renderAnnotationRoomContext(annotation)}
-              {annotation.comment ? (
-                <p className="text-sm text-foreground">{annotation.comment}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">No comment provided</p>
-              )}
-            </div>
+            {renderAnnotationPopoverBody(annotation)}
           </PopoverContent>
         </Popover>
       );
     }
-    
+
     return <div key={annotation.id}>{circleElement}</div>;
   };
 
   // Render freeform annotation
   const renderFreeform = (annotation: Annotation) => {
     if (!annotation.points || annotation.points.length < 2 || !viewBox) return null;
-    
+
     // Convert all points to screen coordinates
-    const screenPoints = annotation.points.map(p => svgToScreen(p.x, p.y));
-    
+    const screenPoints = annotation.points.map((p) => svgToScreen(p.x, p.y));
+
     // Find bounding box
-    const minX = Math.min(...screenPoints.map(p => p.x));
-    const maxX = Math.max(...screenPoints.map(p => p.x));
-    const minY = Math.min(...screenPoints.map(p => p.y));
-    const maxY = Math.max(...screenPoints.map(p => p.y));
-    
+    const minX = Math.min(...screenPoints.map((p) => p.x));
+    const maxX = Math.max(...screenPoints.map((p) => p.x));
+    const minY = Math.min(...screenPoints.map((p) => p.y));
+    const maxY = Math.max(...screenPoints.map((p) => p.y));
+
     const width = maxX - minX + 20;
     const height = maxY - minY + 20;
-    
+
     // Translate points relative to the bounding box
-    const relPoints = screenPoints.map(p => ({
+    const relPoints = screenPoints.map((p) => ({
       x: p.x - minX + 10,
       y: p.y - minY + 10,
     }));
-    
-    const pathD = `M ${relPoints.map(p => `${p.x} ${p.y}`).join(" L ")} Z`;
+
+    const pathD = `M ${relPoints.map((p) => `${p.x} ${p.y}`).join(" L ")} Z`;
     const isStrength = annotation.classification === "strength";
     const isSelected = selectedAnnotation?.id === annotation.id;
-    
+
     const freeformElement = (
       <div
         className={`absolute pointer-events-auto cursor-pointer ${isSelected ? "z-10" : ""}`}
@@ -858,7 +873,7 @@ export function FloorPlanViewer({
           height,
         }}
         onClick={(e) => handleAnnotationClick(annotation, e)}
-        title={readOnly ? "Click to view comment" : `Q${annotation.questionId} - Click to remove`}
+        title={readOnly ? "Click to view comment" : "Click to edit or delete"}
       >
         <svg className="w-full h-full" viewBox={`0 0 ${width} ${height}`}>
           <path
@@ -872,40 +887,22 @@ export function FloorPlanViewer({
         </svg>
       </div>
     );
-    
+
     if (readOnly) {
       return (
-        <Popover key={annotation.id} open={isSelected} onOpenChange={(open) => !open && setSelectedAnnotation(null)}>
-          <PopoverTrigger asChild>
-            {freeformElement}
-          </PopoverTrigger>
+        <Popover
+          key={annotation.id}
+          open={isSelected}
+          onOpenChange={(open) => !open && closeAnnotationPopover()}
+        >
+          <PopoverTrigger asChild>{freeformElement}</PopoverTrigger>
           <PopoverContent className="w-72 p-0" side="top" sideOffset={8}>
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    {questionCategoryLabel(annotation.questionId)}
-                  </p>
-                  <span className={`text-sm font-medium ${isStrength ? "text-emerald-700" : "text-rose-700"}`}>
-                    {isStrength ? "Strength" : "Challenge"}
-                  </span>
-                </div>
-                <Button variant="ghost" size="sm" className="h-6 w-6 shrink-0 p-0" onClick={() => setSelectedAnnotation(null)}>
-                  <X className="h-3 w-3" />
-                </Button>
-              </div>
-              {renderAnnotationRoomContext(annotation)}
-              {annotation.comment ? (
-                <p className="text-sm text-foreground">{annotation.comment}</p>
-              ) : (
-                <p className="text-sm text-muted-foreground italic">No comment provided</p>
-              )}
-            </div>
+            {renderAnnotationPopoverBody(annotation)}
           </PopoverContent>
         </Popover>
       );
     }
-    
+
     return <div key={annotation.id}>{freeformElement}</div>;
   };
 
@@ -1200,6 +1197,60 @@ export function FloorPlanViewer({
               <Button onClick={handleConfirmAnnotation}>
                 Add Annotation
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit / delete existing annotation */}
+      {!readOnly && selectedAnnotation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-foreground">
+                  {questionCategoryLabel(selectedAnnotation.questionId)}
+                </p>
+                <span
+                  className={`text-sm font-medium ${
+                    selectedAnnotation.classification === "strength"
+                      ? "text-emerald-700"
+                      : "text-rose-700"
+                  }`}
+                >
+                  {selectedAnnotation.classification === "strength"
+                    ? "Strength"
+                    : "Challenge"}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 shrink-0 p-0"
+                onClick={closeAnnotationPopover}
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            </div>
+            {renderAnnotationRoomContext(selectedAnnotation)}
+            <textarea
+              value={editComment}
+              onChange={(e) => setEditComment(e.target.value)}
+              placeholder="Add or edit a comment..."
+              className="w-full resize-none rounded-lg border border-border bg-muted/45 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-background"
+              rows={3}
+              autoFocus
+            />
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <Button variant="destructive" onClick={deleteSelectedAnnotation}>
+                Delete
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={closeAnnotationPopover}>
+                  Close
+                </Button>
+                <Button onClick={saveSelectedAnnotationComment}>Save</Button>
+              </div>
             </div>
           </div>
         </div>

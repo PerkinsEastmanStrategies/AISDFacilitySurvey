@@ -14,6 +14,12 @@ export const INTRO_TOUR_STEPS: TourStep[] = [
     placement: "right",
   },
   {
+    target: "position-title",
+    title: "Enter your position title",
+    body: "After choosing a role, type your job title (for example Principal, Assistant Principal, or Facility Manager).",
+    placement: "right",
+  },
+  {
     target: "survey-navigation",
     title: "Begin the assessment",
     body: "Fill in your name and email, then click Next to start. Use the floor plan or site map on the right to orient yourself to the campus while you work.",
