@@ -6,6 +6,8 @@ import type { SubmissionListItem } from "@/lib/load-submission";
 
 export interface SchoolMatrixRow {
   school: string;
+  /** Friendly display name from sheet UpdatedName when available. */
+  displayName: string;
   schoolLevel: string;
   hasFloorPlans: boolean;
   schoolLeaderCount: number;
@@ -27,6 +29,9 @@ export async function buildSchoolMatrix(
   const options = toManifestSchoolOptions(manifest.rows);
   const levelBySchool = new Map(
     manifest.rows.map((row) => [row.schoolName, row.schoolLevel])
+  );
+  const labelBySchool = new Map(
+    options.map((school) => [school.name, school.label])
   );
 
   const bySchool = new Map<string, SubmissionListItem[]>();
@@ -50,6 +55,7 @@ export async function buildSchoolMatrix(
       const ops = items.filter((item) => item.role === "operations");
       return {
         school: school.name,
+        displayName: school.label,
         schoolLevel: levelBySchool.get(school.name) ?? "",
         hasFloorPlans: school.hasFloorPlans,
         schoolLeaderCount: leaders.length,
@@ -64,6 +70,7 @@ export async function buildSchoolMatrix(
       const ops = items.filter((item) => item.role === "operations");
       return {
         school: name,
+        displayName: labelBySchool.get(name) ?? name,
         schoolLevel: "",
         hasFloorPlans: false,
         schoolLeaderCount: leaders.length,

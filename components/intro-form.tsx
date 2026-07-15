@@ -106,7 +106,10 @@ export function IntroForm({
                     ? "Loading schools..."
                     : "Select a school..."
                 }
-              />
+              >
+                {manifestSchools?.find((school) => school.name === data.school)
+                  ?.label}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent className="text-xs">
               {manifestSchools === null ? (
@@ -129,7 +132,7 @@ export function IntroForm({
                         : "text-muted-foreground opacity-50"
                     }
                   >
-                    {school.name}
+                    {school.label}
                     {!school.hasFloorPlans ? " (no floor plan yet)" : ""}
                   </SelectItem>
                 ))

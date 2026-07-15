@@ -36,6 +36,8 @@ export interface FloorPlanLevel {
 
 export interface FloorPlanManifestRow {
   schoolName: string;
+  /** Display name from sheet `UpdatedName` (falls back to schoolName). */
+  updatedName: string;
   schoolLevel: string;
   classCode: string;
   campusId: string;
@@ -90,6 +92,9 @@ export function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
   const schoolLevelIndex = headers.indexOf("school_level");
   const classCodeIndex = headers.indexOf("class_code");
   const campusIdIndex = headers.indexOf("campus_id");
+  const updatedNameIndex = headers.findIndex(
+    (header) => header.toLowerCase() === "updatedname"
+  );
   const floorColumnIndexes = FLOOR_LEVELS.map((level) => ({
     id: level.id,
     index: headers.indexOf(level.column),
@@ -109,8 +114,14 @@ export function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
       if (filename) floors[id] = filename;
     }
 
+    const updatedName =
+      updatedNameIndex === -1
+        ? ""
+        : cells[updatedNameIndex]?.trim() ?? "";
+
     rows.push({
       schoolName,
+      updatedName: updatedName || schoolName,
       schoolLevel:
         schoolLevelIndex === -1 ? "" : cells[schoolLevelIndex]?.trim() ?? "",
       classCode: classCodeIndex === -1 ? "" : cells[classCodeIndex]?.trim() ?? "",
@@ -230,7 +241,10 @@ export async function loadSchoolsWithFloorPlans(): Promise<Set<string> | null> {
 }
 
 export interface ManifestSchoolOption {
+  /** Canonical id from `school_name` (used for floor plans / submissions). */
   name: string;
+  /** Friendly label from sheet `UpdatedName`. */
+  label: string;
   hasFloorPlans: boolean;
 }
 
@@ -243,6 +257,7 @@ export async function loadManifestSchoolOptions(): Promise<
 
   return manifest.map((row) => ({
     name: row.schoolName,
+    label: row.updatedName || row.schoolName,
     hasFloorPlans: rowHasFloorPlans(row),
   }));
 }

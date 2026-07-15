@@ -113,11 +113,14 @@ export function AdminDashboard() {
 
   const schools = useMemo(() => {
     if (schoolMatrix.length > 0) {
-      return schoolMatrix.map((row) => row.school);
+      return schoolMatrix.map((row) => ({
+        name: row.school,
+        label: row.displayName || row.school,
+      }));
     }
-    return Array.from(new Set(submissions.map((item) => item.school))).sort(
-      (a, b) => a.localeCompare(b)
-    );
+    return Array.from(new Set(submissions.map((item) => item.school)))
+      .sort((a, b) => a.localeCompare(b))
+      .map((name) => ({ name, label: name }));
   }, [schoolMatrix, submissions]);
 
   const schoolSubmissions = useMemo(
@@ -131,7 +134,13 @@ export function AdminDashboard() {
   const filteredMatrix = useMemo(() => {
     const query = matrixFilter.trim().toLowerCase();
     return schoolMatrix.filter((row) => {
-      if (query && !row.school.toLowerCase().includes(query)) return false;
+      if (
+        query &&
+        !row.school.toLowerCase().includes(query) &&
+        !(row.displayName || "").toLowerCase().includes(query)
+      ) {
+        return false;
+      }
       const hasLeader = row.schoolLeaderCount > 0;
       const hasOps = row.operationsCount > 0;
       if (coverageFilter === "complete") return hasLeader && hasOps;
@@ -425,12 +434,15 @@ export function AdminDashboard() {
                   disabled={listLoading || schools.length === 0}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a school" />
+                    <SelectValue placeholder="Select a school">
+                      {schools.find((school) => school.name === selectedSchool)
+                        ?.label}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {schools.map((school) => (
-                      <SelectItem key={school} value={school}>
-                        {school}
+                      <SelectItem key={school.name} value={school.name}>
+                        {school.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

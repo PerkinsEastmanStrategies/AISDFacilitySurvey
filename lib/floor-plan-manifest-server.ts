@@ -79,6 +79,7 @@ export function toManifestSchoolOptions(
 ): ManifestSchoolOption[] {
   return rows.map((row) => ({
     name: row.schoolName,
+    label: row.updatedName || row.schoolName,
     hasFloorPlans: rowHasFloorPlans(row),
   }));
 }
