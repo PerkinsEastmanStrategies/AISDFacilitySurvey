@@ -38,6 +38,7 @@ import {
   Send,
   Loader2,
   CheckCircle2,
+  MessageSquareWarning,
 } from "lucide-react";
 import { AnnotationToolbar, type Tool, type Classification } from "@/components/annotation-toolbar";
 import { GuidedTour } from "@/components/guided-tour";
@@ -147,6 +148,7 @@ export default function SurveyApp({
   const [draftReady, setDraftReady] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [missingFeedbackOpen, setMissingFeedbackOpen] = useState(false);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
   // On phones, keep map/plan collapsed until the user opens it so WebGL/SVG
   // don't load while they are still answering the first question.
@@ -608,17 +610,56 @@ export default function SurveyApp({
     }
   };
 
+  const annotationsEnabledForViewer =
+    step === "questions" &&
+    !isSpacesQuestion &&
+    !isRankingPanel &&
+    !isTextPanel;
+
+  const panelHasCommentsOrAnnotations = useMemo(() => {
+    if (!currentPanel || !annotationsEnabledForViewer) return true;
+    const hasNotes = currentPanel.questions.some((q) => {
+      const response = surveyData.responses.find((r) => r.questionId === q.id);
+      return Boolean(response?.explanation?.trim());
+    });
+    if (hasNotes) return true;
+    return surveyData.annotations.some((a) =>
+      panelQuestionIds.includes(a.questionId)
+    );
+  }, [
+    annotationsEnabledForViewer,
+    currentPanel,
+    panelQuestionIds,
+    surveyData.annotations,
+    surveyData.responses,
+  ]);
+
+  const advanceFromCurrentPanel = () => {
+    if (currentPanelIndex < panels.length - 1) {
+      setCurrentPanelIndex((prev) => prev + 1);
+    } else {
+      void handleSubmitSurvey();
+    }
+  };
+
   const handleNext = () => {
     if (step === "intro") {
       setStep("questions");
       setCurrentPanelIndex(0);
-    } else if (step === "questions") {
-      if (currentPanelIndex < panels.length - 1) {
-        setCurrentPanelIndex((prev) => prev + 1);
-      } else {
-        void handleSubmitSurvey();
-      }
+      return;
     }
+    if (step === "questions") {
+      if (annotationsEnabledForViewer && !panelHasCommentsOrAnnotations) {
+        setMissingFeedbackOpen(true);
+        return;
+      }
+      advanceFromCurrentPanel();
+    }
+  };
+
+  const handleContinueWithoutFeedback = () => {
+    setMissingFeedbackOpen(false);
+    advanceFromCurrentPanel();
   };
 
   const handleBack = () => {
@@ -670,12 +711,6 @@ export default function SurveyApp({
           : rightView === "floorplan"
             ? `Annotate areas related to: ${currentPanel.label}`
             : `Drop pins on the map related to: ${currentPanel.label}`;
-
-  const annotationsEnabledForViewer =
-    step === "questions" &&
-    !isSpacesQuestion &&
-    !isRankingPanel &&
-    !isTextPanel;
 
   const renderViewToggle = (compact = false) => (
     <div
@@ -1330,6 +1365,47 @@ export default function SurveyApp({
         onClose={() => setRunTour(false)}
       />
       <WelcomeDialog open={showWelcome} onClose={handleWelcomeClose} />
+
+      {missingFeedbackOpen && (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="missing-feedback-title"
+        >
+          <div className="w-full max-w-md rounded-xl border border-border bg-card p-5 shadow-xl sm:p-6">
+            <div className="mb-3 flex items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200">
+                <MessageSquareWarning className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <h3
+                  id="missing-feedback-title"
+                  className="font-heading text-base font-semibold text-foreground"
+                >
+                  No comments or plan markings yet
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  You haven&apos;t added a written comment or marked anything on
+                  the floor plan / site map for this step. Stay to add feedback,
+                  or continue without it.
+                </p>
+              </div>
+            </div>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setMissingFeedbackOpen(false)}
+              >
+                Stay and add feedback
+              </Button>
+              <Button onClick={handleContinueWithoutFeedback}>
+                {isLastPanel ? "Submit anyway" : "Continue anyway"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
