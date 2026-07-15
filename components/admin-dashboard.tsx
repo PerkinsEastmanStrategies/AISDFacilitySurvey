@@ -664,7 +664,7 @@ export function AdminDashboard() {
                               className="text-left font-medium text-foreground hover:underline"
                               onClick={() => openSchoolDetail(row.school)}
                             >
-                              {row.school}
+                              {row.displayName || row.school}
                             </button>
                             {!row.hasFloorPlans && (
                               <span className="mt-0.5 block text-[10px] text-muted-foreground">
