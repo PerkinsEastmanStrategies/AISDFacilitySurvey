@@ -68,6 +68,7 @@ import {
 } from "@/lib/floor-plan-manifest";
 import { isValidEmail, type SurveySubmissionPayload } from "@/lib/submit-survey";
 import { parsePopupNote } from "@/lib/deferred-survey-schools";
+import { isMapOnlySchool } from "@/lib/map-only-schools";
 import Image from "next/image";
 
 type Step = SurveyStep;
@@ -403,6 +404,20 @@ export default function SurveyApp({
         setSurveyData((prev) =>
           prev.svgContent === null ? prev : { ...prev, svgContent: null }
         );
+        return;
+      }
+
+      if (isMapOnlySchool(surveyData.school)) {
+        setAvailableFloors([]);
+        setActiveFloorId("floor-1");
+        setFloorPlanLoading(false);
+        setRightView("map");
+        setSurveyData((prev) => ({
+          ...prev,
+          svgContent: null,
+          spaceAssignments: {},
+          annotations: prev.annotations.filter((annotation) => annotation.view === "map"),
+        }));
         return;
       }
 
@@ -1377,12 +1392,18 @@ export default function SurveyApp({
                             <h2 className="font-sans text-sm font-bold text-foreground">
                               {currentPanel.label}
                             </h2>
+                            {isTextPanel && (
+                              <p className="pt-1 text-xs font-semibold leading-relaxed text-foreground">
+                                {currentQuestion.text}
+                              </p>
+                            )}
                           </div>
                           <QuestionForm
                             questionId={currentQuestion.id}
                             response={currentResponse}
                             onChange={handleResponseChange}
                             omitMetaHeader
+                            textRequired={isTextPanel}
                           />
                         </div>
                       ) : (

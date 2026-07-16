@@ -5,13 +5,22 @@ export const SURVEY_TITLE =
 export const SURVEY_QUESTIONS = [
   {
     id: 1,
-    text: "The studios and instructional spaces effectively support the teaching methods and learning experiences expected for today's students.",
-    category: "Learning Environment",
+    text: "The school's studios easily accommodate different teaching approaches, group sizes, and learning activities.",
+    category: "Learning Studios",
     /** Short label for progress chips (avoids crowding long category names). */
-    navLabel: "Learning",
+    navLabel: "Studios",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(220, 70%, 50%)",
+  },
+  {
+    id: 4,
+    text: "The school's collaboration spaces easily accommodate different teaching approaches, group sizes, and learning activities.",
+    category: "Collaboration Spaces",
+    navLabel: "Collaboration",
+    section: "Educational Suitability",
+    type: "rating",
+    color: "hsl(30, 80%, 50%)",
   },
   {
     id: 2,
@@ -21,24 +30,6 @@ export const SURVEY_QUESTIONS = [
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(160, 60%, 45%)",
-  },
-  {
-    id: 3,
-    text: "The school's studios and other learning spaces can be easily adapted to accommodate different teaching approaches, group sizes, and learning activities.",
-    category: "Flexibility of Spaces",
-    navLabel: "Flexibility",
-    section: "Educational Suitability",
-    type: "rating",
-    color: "hsl(280, 60%, 50%)",
-  },
-  {
-    id: 4,
-    text: "The facility effectively supports student collaboration, project-based learning, and small group instruction in spaces outside of studios.",
-    category: "Collaboration Opportunities",
-    navLabel: "Collaboration",
-    section: "Educational Suitability",
-    type: "rating",
-    color: "hsl(30, 80%, 50%)",
   },
   {
     id: 5,
@@ -156,6 +147,24 @@ export const SURVEY_QUESTIONS = [
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(120, 50%, 45%)",
+  },
+  {
+    id: 62,
+    text: "Where do district initiatives, policies, and systems clash with your building's layout and how you are expected to teach and operate within it?",
+    category: "Policies",
+    navLabel: "Policies",
+    section: "Educational Suitability",
+    type: "text",
+    color: "hsl(275, 45%, 48%)",
+  },
+  {
+    id: 63,
+    text: "What training and resources do you and your faculty need to increase student achievement, utilizing flexible learning environments as a tool?",
+    category: "Training",
+    navLabel: "Training",
+    section: "Educational Suitability",
+    type: "text",
+    color: "hsl(190, 55%, 42%)",
   },
   {
     id: 18,
@@ -665,8 +674,8 @@ export function formatRatingDisplay(
 }
 
 /**
- * Categories respondents rank in Campus Improvement Priorities (Q18).
- * Likert categories #1–15 only — excludes Overall Educational Suitability.
+ * Rating categories respondents rank in Campus Improvement Priorities.
+ * Excludes Overall Educational Suitability and open-response prompts.
  */
 export const PRIORITIZATION_CATEGORIES: string[] = SURVEY_QUESTIONS.filter(
   (q) =>

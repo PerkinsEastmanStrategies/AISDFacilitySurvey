@@ -154,8 +154,87 @@ export function cropMountedSvgToContent(
 export const MOUNT_CROP_MAX_CHARS = 7 * 1024 * 1024;
 
 const FLOOR_PLAN_CONTRAST_STYLE_ID = "aisd-floor-plan-contrast";
+const OVERLAP_HIDDEN_ATTRIBUTE = "data-aisd-overlap-hidden";
 
 export type FloorPlanContrastBoost = "default" | "mobile";
+
+/**
+ * Visually hide CAFM label groups whose rendered bounds touch another label.
+ *
+ * The nodes remain in #CAFM_ID with their text and transforms intact, so room
+ * parsing, click identification, and polygon highlighting still work.
+ */
+export function suppressOverlappingCafmLabels(
+  svgElement: SVGSVGElement,
+  paddingPx = 0.5
+): number {
+  const cafmId = svgElement.querySelector("#CAFM_ID");
+  if (!cafmId) return 0;
+
+  let labels = Array.from(
+    cafmId.querySelectorAll<SVGGElement>(
+      ':scope > g[id^="TEXT"], :scope > g[id^="MTEXT"]'
+    )
+  );
+
+  if (labels.length === 0) {
+    labels = Array.from(cafmId.querySelectorAll<SVGGElement>("g")).filter(
+      (group) => Boolean(group.querySelector(":scope > text, :scope > g > text"))
+    );
+  }
+
+  // Some exports nest candidate groups. Keep only the outermost label wrapper.
+  const labelSet = new Set(labels);
+  labels = labels.filter((group) => {
+    let parent = group.parentElement;
+    while (parent && parent !== cafmId) {
+      if (labelSet.has(parent as SVGGElement)) return false;
+      parent = parent.parentElement;
+    }
+    return true;
+  });
+
+  const measured = labels
+    .map((element, index) => {
+      const bounds = element.getBoundingClientRect();
+      if (!(bounds.width > 0 && bounds.height > 0)) return null;
+      return {
+        element,
+        index,
+        left: bounds.left - paddingPx,
+        top: bounds.top - paddingPx,
+        right: bounds.right + paddingPx,
+        bottom: bounds.bottom + paddingPx,
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
+  const hidden = new Set<number>();
+  for (let i = 0; i < measured.length; i++) {
+    const a = measured[i];
+    for (let j = i + 1; j < measured.length; j++) {
+      const b = measured[j];
+      const overlaps =
+        a.left < b.right &&
+        a.right > b.left &&
+        a.top < b.bottom &&
+        a.bottom > b.top;
+      if (overlaps) {
+        hidden.add(a.index);
+        hidden.add(b.index);
+      }
+    }
+  }
+
+  for (const index of hidden) {
+    const element = labels[index];
+    element.setAttribute(OVERLAP_HIDDEN_ATTRIBUTE, "true");
+    element.style.setProperty("opacity", "0", "important");
+    element.style.setProperty("pointer-events", "none", "important");
+  }
+
+  return hidden.size;
+}
 
 /**
  * Boost line contrast for display. Injected at render time so source SVG files

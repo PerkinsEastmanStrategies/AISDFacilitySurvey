@@ -2,6 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import {
   DEFAULT_FLOOR_PLAN_MANIFEST_URL,
+  getManifestSchoolDisplayLabel,
   parseManifestCsv,
   rowHasFloorPlans,
   type FloorPlanManifestRow,
@@ -80,7 +81,7 @@ export function toManifestSchoolOptions(
   return rows
     .map((row) => ({
       name: row.schoolName,
-      label: row.updatedName || row.schoolName,
+      label: getManifestSchoolDisplayLabel(row),
       hasFloorPlans: rowHasFloorPlans(row),
       popupNote: row.popupNote,
     }))

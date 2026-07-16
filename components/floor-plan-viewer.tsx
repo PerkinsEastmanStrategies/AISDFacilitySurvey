@@ -38,6 +38,7 @@ import {
   cropMountedSvgToContent,
   enhanceFloorPlanLineContrast,
   resolveSvgViewBox,
+  suppressOverlappingCafmLabels,
   LARGE_SVG_CHAR_THRESHOLD,
   MOUNT_CROP_MAX_CHARS,
   type SvgViewBox,
@@ -228,19 +229,21 @@ export function FloorPlanViewer({
 
     setHighlightPolygon(null);
 
-    // Crop empty CAFM canvas margins so the building fills the viewer.
-    // Uses root getBBox on the already-mounted SVG (respects transforms).
-    // Raised to 7MB so large campuses like Anderson (~2.8MB) are included;
-    // parse-time clone crop still stays behind LARGE_SVG_CHAR_THRESHOLD.
+    // Wait for SVG layout, then hide colliding labels visually. Their CAFM_ID
+    // nodes remain available for room matching and click identification.
     const sourceLen = svgSourceLengthRef.current;
-    if (sourceLen > 0 && sourceLen < MOUNT_CROP_MAX_CHARS) {
-      const frameId = requestAnimationFrame(() => {
-        if (svgRef.current !== mounted) return;
+    const frameId = requestAnimationFrame(() => {
+      if (svgRef.current !== mounted) return;
+      suppressOverlappingCafmLabels(mounted);
+
+      // Crop empty CAFM canvas margins so the building fills the viewer.
+      // Uses root getBBox on the already-mounted SVG (respects transforms).
+      if (sourceLen > 0 && sourceLen < MOUNT_CROP_MAX_CHARS) {
         const cropped = cropMountedSvgToContent(mounted);
         if (cropped) setViewBox(cropped);
-      });
-      return () => cancelAnimationFrame(frameId);
-    }
+      }
+    });
+    return () => cancelAnimationFrame(frameId);
   }, [svgMountKey, svgReady]);
 
   useEffect(() => {

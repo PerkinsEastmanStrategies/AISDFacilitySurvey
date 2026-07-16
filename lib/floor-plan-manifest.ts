@@ -268,6 +268,14 @@ export interface ManifestSchoolOption {
   popupNote?: string;
 }
 
+/** Presentation-only overrides for campus names in the survey dropdown. */
+export function getManifestSchoolDisplayLabel(
+  row: Pick<FloorPlanManifestRow, "schoolName" | "updatedName">
+): string {
+  if (row.schoolName.trim().toUpperCase() === "METZ") return "Metz";
+  return row.updatedName || row.schoolName;
+}
+
 /** Schools listed in the floor plan manifest, in sheet order. Empty if unavailable. */
 export async function loadManifestSchoolOptions(): Promise<
   ManifestSchoolOption[]
@@ -278,7 +286,7 @@ export async function loadManifestSchoolOptions(): Promise<
   return manifest
     .map((row) => ({
       name: row.schoolName,
-      label: row.updatedName || row.schoolName,
+      label: getManifestSchoolDisplayLabel(row),
       hasFloorPlans: rowHasFloorPlans(row),
       popupNote: row.popupNote,
     }))

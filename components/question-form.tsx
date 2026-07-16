@@ -355,7 +355,7 @@ export function QuestionForm({
                 onChange({ ...safeResponse, explanation: e.target.value })
               }
               placeholder={
-                textRequired
+                textRequired && question.id === 17
                   ? "List your top 3 safety and security priorities…"
                   : "Type your response..."
               }

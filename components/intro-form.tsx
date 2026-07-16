@@ -24,6 +24,7 @@ import {
   parsePopupNote,
   type DeferredSurveyNotice,
 } from "@/lib/deferred-survey-schools";
+import { isMapOnlySchool } from "@/lib/map-only-schools";
 
 interface SchoolInfo {
   school: string;
@@ -80,7 +81,10 @@ export function IntroForm({
   useEffect(() => {
     if (!manifestSchools || !data.school) return;
     const match = manifestSchools.find((school) => school.name === data.school);
-    if (!match || !match.hasFloorPlans) {
+    if (
+      !match ||
+      (!match.hasFloorPlans && !isMapOnlySchool(match.name))
+    ) {
       onChange({ ...data, school: "" });
     }
     // Only re-check when manifest availability loads.
@@ -167,15 +171,21 @@ export function IntroForm({
                   <SelectItem
                     key={school.name}
                     value={school.name}
-                    disabled={!school.hasFloorPlans}
+                    disabled={
+                      !school.hasFloorPlans && !isMapOnlySchool(school.name)
+                    }
                     className={
-                      school.hasFloorPlans
+                      school.hasFloorPlans || isMapOnlySchool(school.name)
                         ? undefined
                         : "text-muted-foreground opacity-50"
                     }
                   >
                     {school.label}
-                    {!school.hasFloorPlans ? " (no floor plan yet)" : ""}
+                    {isMapOnlySchool(school.name)
+                      ? " (map only)"
+                      : !school.hasFloorPlans
+                        ? " (no floor plan yet)"
+                        : ""}
                   </SelectItem>
                 ))
               )}
@@ -184,7 +194,8 @@ export function IntroForm({
           {manifestSchools && (
             <p className="text-[10px] text-muted-foreground">
               Schools are loaded from the live floor plan list. Schools without
-              uploaded floor plans are shown in gray and cannot be selected yet.
+              uploaded floor plans are shown in gray and cannot be selected yet,
+              except campuses designated as map only.
             </p>
           )}
         </div>
