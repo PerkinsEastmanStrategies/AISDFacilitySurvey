@@ -463,6 +463,10 @@ export default function SurveyApp({
   );
 
   const selectedSchool = getSchoolByName(surveyData.school);
+  const schoolDisplayName =
+    initialSchools.find((school) => school.name === surveyData.school)?.label ||
+    surveyData.school ||
+    "";
 
   // Extract room numbers from the uploaded floor plan SVG
   const rooms = useMemo(
@@ -1066,9 +1070,18 @@ export default function SurveyApp({
               <h1 className="truncate font-sans text-xs font-semibold tracking-tight text-foreground sm:text-sm">
                 {SURVEY_TITLE}
               </h1>
-              <p className="hidden text-[10px] text-muted-foreground sm:block">
-                Facility Planning &amp; Capital Assessment
-              </p>
+              {schoolDisplayName ? (
+                <p className="truncate text-[11px] font-semibold text-primary sm:text-xs">
+                  <span className="font-medium text-muted-foreground">
+                    Campus:{" "}
+                  </span>
+                  {schoolDisplayName}
+                </p>
+              ) : (
+                <p className="hidden text-[10px] text-muted-foreground sm:block">
+                  Facility Planning &amp; Capital Assessment
+                </p>
+              )}
             </div>
             <div className="hidden h-5 w-px bg-border/60 sm:ml-2 sm:block md:h-7" />
             <div className="hidden text-right sm:block">
