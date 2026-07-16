@@ -275,8 +275,8 @@ export function QuestionForm({
               </div>
               <div className="mt-px flex items-center gap-1">
                 <Badge
-                  style={{ backgroundColor: question.color }}
-                  className="px-1.5 py-px text-[9px] text-white"
+                  variant="secondary"
+                  className="px-1.5 py-px text-[9px]"
                 >
                   {question.category}
                 </Badge>

@@ -963,8 +963,8 @@ export default function SurveyApp({
           )}
         {step === "questions" && (
           <Badge
-            style={{ backgroundColor: currentPanel.color }}
-            className="w-fit px-1.5 py-px text-[10px] text-white"
+            variant="secondary"
+            className="w-fit px-1.5 py-px text-[10px]"
           >
             {currentPanel.label}
           </Badge>
@@ -1237,11 +1237,6 @@ export default function SurveyApp({
                                         : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
                                     }`}
                                   >
-                                    <span
-                                      className="mr-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
-                                      style={{ backgroundColor: p.color }}
-                                      aria-hidden
-                                    />
                                     <span className="truncate">{p.navLabel}</span>
                                   </button>
                                 );
@@ -1273,8 +1268,8 @@ export default function SurveyApp({
                           {/* Category header (shown once for the whole panel) */}
                           <div className="space-y-0.5">
                             <Badge
-                              style={{ backgroundColor: currentPanel.color }}
-                              className="px-1.5 py-px text-[9px] text-white"
+                              variant="secondary"
+                              className="px-1.5 py-px text-[9px]"
                             >
                               {currentPanel.section}
                             </Badge>
@@ -1348,8 +1343,8 @@ export default function SurveyApp({
                         <div className="space-y-3">
                           <div className="space-y-0.5">
                             <Badge
-                              style={{ backgroundColor: currentPanel.color }}
-                              className="px-1.5 py-px text-[9px] text-white"
+                              variant="secondary"
+                              className="px-1.5 py-px text-[9px]"
                             >
                               {currentPanel.section}
                             </Badge>
@@ -1368,8 +1363,8 @@ export default function SurveyApp({
                         <div className="space-y-3">
                           <div className="space-y-0.5">
                             <Badge
-                              style={{ backgroundColor: currentPanel.color }}
-                              className="px-1.5 py-px text-[9px] text-white"
+                              variant="secondary"
+                              className="px-1.5 py-px text-[9px]"
                             >
                               {currentPanel.section}
                             </Badge>
