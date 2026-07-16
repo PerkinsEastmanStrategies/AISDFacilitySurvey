@@ -146,6 +146,13 @@ export function cropMountedSvgToContent(
   }
 }
 
+/**
+ * Mount-time content crop is allowed up to this SVG character length.
+ * Large CAFM plans (e.g. Anderson ~2.8MB) need this so empty artboard
+ * margins are trimmed; root getBBox on a mounted SVG is typically fast.
+ */
+export const MOUNT_CROP_MAX_CHARS = 7 * 1024 * 1024;
+
 const FLOOR_PLAN_CONTRAST_STYLE_ID = "aisd-floor-plan-contrast";
 
 export type FloorPlanContrastBoost = "default" | "mobile";

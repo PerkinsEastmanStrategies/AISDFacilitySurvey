@@ -39,6 +39,7 @@ import {
   enhanceFloorPlanLineContrast,
   resolveSvgViewBox,
   LARGE_SVG_CHAR_THRESHOLD,
+  MOUNT_CROP_MAX_CHARS,
   type SvgViewBox,
 } from "@/lib/svg-utils";
 import type { Tool, Classification } from "@/components/annotation-toolbar";
@@ -228,11 +229,11 @@ export function FloorPlanViewer({
     setHighlightPolygon(null);
 
     // Crop empty CAFM canvas margins so the building fills the viewer.
-    // Skip only for very large files where getBBox can be costly on phones.
-    const canCrop =
-      svgSourceLengthRef.current > 0 &&
-      svgSourceLengthRef.current < LARGE_SVG_CHAR_THRESHOLD * 2;
-    if (canCrop) {
+    // Uses root getBBox on the already-mounted SVG (respects transforms).
+    // Raised to 7MB so large campuses like Anderson (~2.8MB) are included;
+    // parse-time clone crop still stays behind LARGE_SVG_CHAR_THRESHOLD.
+    const sourceLen = svgSourceLengthRef.current;
+    if (sourceLen > 0 && sourceLen < MOUNT_CROP_MAX_CHARS) {
       const frameId = requestAnimationFrame(() => {
         if (svgRef.current !== mounted) return;
         const cropped = cropMountedSvgToContent(mounted);
