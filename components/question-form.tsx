@@ -44,6 +44,8 @@ interface QuestionFormProps {
    * meta header and lead with the statement text.
    */
   omitMetaHeader?: boolean;
+  /** Mark open-ended text responses as required (e.g. Safety priorities). */
+  textRequired?: boolean;
   /** Where Mark Locations sits relative to the explanation for guide copy. */
   annotationToolsPosition?: "above" | "below";
 }
@@ -55,6 +57,7 @@ export function QuestionForm({
   compact = false,
   parts = "full",
   omitMetaHeader = false,
+  textRequired = false,
   annotationToolsPosition = "above",
 }: QuestionFormProps) {
   const question = SURVEY_QUESTIONS.find((q) => q.id === questionId);
@@ -260,7 +263,8 @@ export function QuestionForm({
 
   return (
     <Card className="gap-2 border-border/60 py-2.5 shadow-sm">
-      {(parts === "full" || parts === "prompt-rating") && (
+      {(parts === "full" || parts === "prompt-rating") &&
+        !(omitMetaHeader && question.type === "text") && (
         <CardHeader className="px-2.5 pb-1.5">
           {!omitMetaHeader && (
             <>
@@ -338,7 +342,11 @@ export function QuestionForm({
           <div className="space-y-1">
             <Label htmlFor="open-response" className="text-[11px] font-medium text-foreground">
               Your response{" "}
-              <span className="font-normal text-muted-foreground">(optional)</span>
+              {textRequired ? (
+                requiredMark
+              ) : (
+                <span className="font-normal text-muted-foreground">(optional)</span>
+              )}
             </Label>
             <Textarea
               id="open-response"
@@ -346,8 +354,14 @@ export function QuestionForm({
               onChange={(e) =>
                 onChange({ ...safeResponse, explanation: e.target.value })
               }
-              placeholder="Type your response..."
+              placeholder={
+                textRequired
+                  ? "List your top 3 safety and security priorities…"
+                  : "Type your response..."
+              }
               rows={3}
+              required={textRequired}
+              aria-required={textRequired}
               className="resize-none text-[10px] md:text-[10px]"
             />
           </div>

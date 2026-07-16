@@ -59,6 +59,15 @@ export const SURVEY_QUESTIONS = [
     color: "hsl(200, 70%, 45%)",
   },
   {
+    id: 17,
+    text: "What are your top 3 safety and security priorities for this campus?",
+    category: "Safety and Supervision",
+    navLabel: "Safety",
+    section: "Educational Suitability",
+    type: "text",
+    color: "hsl(200, 70%, 45%)",
+  },
+  {
     id: 7,
     text: "Spaces such as the library, cafeteria, gymnasium, and multipurpose areas effectively support student and school needs.",
     category: "Common Areas and Shared Spaces",
@@ -147,15 +156,6 @@ export const SURVEY_QUESTIONS = [
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(120, 50%, 45%)",
-  },
-  {
-    id: 17,
-    text: "What are your top 3 safety and security priorities for this campus?",
-    category: "Safety and Security Priorities",
-    navLabel: "Priorities",
-    section: "Educational Suitability",
-    type: "text",
-    color: "hsl(0, 70%, 45%)",
   },
   {
     id: 18,
@@ -690,6 +690,18 @@ export function getAnnotationPinLabel(questionId: number): string {
   const nav = getQuestionNavLabel(question);
   const word = nav.split(/\s+/)[0] ?? nav;
   return word.length <= 5 ? word : word.slice(0, 4);
+}
+
+/** Whether a survey response is complete enough to leave its panel. */
+export function isQuestionResponseComplete(
+  question: SurveyQuestion,
+  response: QuestionResponse | undefined
+): boolean {
+  if (question.type === "ranking" || question.type === "spaces") return true;
+  if (question.type === "text") {
+    return Boolean(response?.explanation?.trim());
+  }
+  return Boolean(response && isRatingAnswered(response.rating));
 }
 
 /**

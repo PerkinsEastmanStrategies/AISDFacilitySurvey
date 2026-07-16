@@ -18,7 +18,7 @@ import {
   getQuestionsForRole,
   getQuestionNavLabel,
   FCA_LIKERT_SCALE_NOTE,
-  isRatingAnswered,
+  isQuestionResponseComplete,
   SCHOOL_LEADER_FCA_QUESTION_IDS,
   createEmptyResponses,
   mergeSurveyResponses,
@@ -110,7 +110,7 @@ function StepSection({
   title,
   children,
 }: {
-  letter: "A" | "B" | "C";
+  letter: "A" | "B" | "C" | "D";
   title: ReactNode;
   children: ReactNode;
 }) {
@@ -244,10 +244,11 @@ export default function SurveyApp({
     [surveyData.role]
   );
 
-  // Group the active questions into "panels". Educational Suitability and
-  // School Leader campus-condition questions are each their own panel (one
-  // question per step). Operations Facility Condition questions are grouped
-  // by category so an entire category is rated within one panel.
+  // Group the active questions into "panels". Educational Suitability questions
+  // that share a category (e.g. Safety rating + open-ended priorities) are
+  // kept together. Operations Facility Condition questions are grouped by
+  // category so an entire category is rated within one panel. School Leader
+  // campus-condition prompts stay one question per step.
   const panels = useMemo<Panel[]>(() => {
     const result: Panel[] = [];
     let i = 0;
@@ -274,6 +275,33 @@ export default function SurveyApp({
           label: category,
           navLabel: category,
           color: q.color,
+          questions: group,
+        });
+      } else if (q.section === "Educational Suitability") {
+        // ESA: group consecutive items that share a category (Safety rating +
+        // open-ended priorities). All other ESA topics stay one per panel.
+        const category = q.category;
+        const group = [];
+        while (
+          i < activeQuestions.length &&
+          activeQuestions[i].section === "Educational Suitability" &&
+          activeQuestions[i].category === category
+        ) {
+          group.push(activeQuestions[i]);
+          i += 1;
+        }
+        const primary =
+          group.find((item) => item.type === "rating") ?? group[0];
+        const areaLabel =
+          "area" in primary && typeof primary.area === "string"
+            ? primary.area
+            : undefined;
+        result.push({
+          kind: "question",
+          section: q.section,
+          label: areaLabel || category,
+          navLabel: getQuestionNavLabel(primary),
+          color: primary.color,
           questions: group,
         });
       } else {
@@ -305,19 +333,32 @@ export default function SurveyApp({
     }
   }, [currentPanel?.section]);
 
-  // Representative question for the right-hand annotation surface.
-  const currentQuestion = currentPanel?.questions[0];
+  // Representative question for the right-hand annotation surface (prefer rating).
+  const currentQuestion =
+    currentPanel?.questions.find((q) => q.type === "rating") ??
+    currentPanel?.questions[0];
   const currentResponse =
     surveyData.responses.find((r) => r.questionId === currentQuestion?.id) ?? {
       questionId: currentQuestion?.id ?? 0,
       rating: 0,
       explanation: "",
     };
+  const companionTextQuestion = currentPanel?.questions.find(
+    (q) => q.type === "text" && q.id !== currentQuestion?.id
+  );
+  const companionTextResponse = companionTextQuestion
+    ? surveyData.responses.find((r) => r.questionId === companionTextQuestion.id) ?? {
+        questionId: companionTextQuestion.id,
+        rating: 0,
+        explanation: "",
+      }
+    : null;
 
   // Whether we're on the dedicated "program space locations" question (Q14).
   const isSpacesQuestion = currentQuestion?.type === "spaces";
   const isRankingPanel = currentQuestion?.type === "ranking";
-  const isTextPanel = currentQuestion?.type === "text";
+  const isTextPanel =
+    currentQuestion?.type === "text" && !companionTextQuestion;
   // All question ids belonging to the current panel (used to tally annotations).
   const panelQuestionIds = useMemo<number[]>(
     () => (currentPanel ? currentPanel.questions.map((q) => q.id) : []),
@@ -762,13 +803,13 @@ export default function SurveyApp({
       );
     }
     if (step === "questions") {
-      // Ranking, open-ended text, and space-location questions have a valid
-      // default state, so respondents can always proceed past them.
-      if (isRankingPanel || isSpacesQuestion || isTextPanel) return true;
-      // Every rating question in the current panel must be answered.
+      // Ranking and space-location questions have a valid default state.
+      if (isRankingPanel || isSpacesQuestion) return true;
+      // Every question in the current panel must be answered (ratings + any
+      // required open-ended text such as Safety priorities).
       return currentPanel.questions.every((q) => {
         const r = surveyData.responses.find((res) => res.questionId === q.id);
-        return r && isRatingAnswered(r.rating);
+        return isQuestionResponseComplete(q, r);
       });
     }
     return true;
@@ -1135,12 +1176,10 @@ export default function SurveyApp({
                       );
                       const completedCount = sectionPanels.filter((p) =>
                         p.questions.every((q) => {
-                          if (q.type === "ranking" || q.type === "spaces")
-                            return true;
                           const r = surveyData.responses.find(
                             (res) => res.questionId === q.id
                           );
-                          return r && isRatingAnswered(r.rating);
+                          return isQuestionResponseComplete(q, r);
                         })
                       ).length;
                       return (
@@ -1177,15 +1216,10 @@ export default function SurveyApp({
                               {panels.map((p, idx) => {
                                 if (p.section !== section) return null;
                                 const isComplete = p.questions.every((q) => {
-                                  if (
-                                    q.type === "ranking" ||
-                                    q.type === "spaces"
-                                  )
-                                    return true;
                                   const r = surveyData.responses.find(
                                     (res) => res.questionId === q.id
                                   );
-                                  return r && isRatingAnswered(r.rating);
+                                  return isQuestionResponseComplete(q, r);
                                 });
                                 const isCurrent = idx === currentPanelIndex;
                                 // Category-style chips for every panel (short
@@ -1365,8 +1399,27 @@ export default function SurveyApp({
                               omitMetaHeader
                             />
                           </StepSection>
+                          {companionTextQuestion && companionTextResponse && (
+                            <StepSection
+                              letter="B"
+                              title={
+                                <>
+                                  {companionTextQuestion.text}{" "}
+                                  <span className="text-destructive">*</span>
+                                </>
+                              }
+                            >
+                              <QuestionForm
+                                questionId={companionTextQuestion.id}
+                                response={companionTextResponse}
+                                onChange={handleResponseChange}
+                                omitMetaHeader
+                                textRequired
+                              />
+                            </StepSection>
+                          )}
                           <StepSection
-                            letter="B"
+                            letter={companionTextQuestion ? "C" : "B"}
                             title={
                               <>
                                 Mark locations on the floor plan or site map{" "}
@@ -1389,7 +1442,7 @@ export default function SurveyApp({
                             </div>
                           </StepSection>
                           <StepSection
-                            letter="C"
+                            letter={companionTextQuestion ? "D" : "C"}
                             title={
                               <>
                                 Explain your rating{" "}
