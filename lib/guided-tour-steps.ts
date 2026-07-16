@@ -27,6 +27,28 @@ export const INTRO_TOUR_STEPS: TourStep[] = [
   },
 ];
 
+/** Short auto-tour shown on the first rating question (ESA or FCA). */
+export const MINI_QUESTION_TOUR_STEPS: TourStep[] = [
+  {
+    target: "annotation-toolbar",
+    title: "Mark strengths and challenges",
+    body: "After you choose a 1–5 rating, use Pin, Circle, or Draw to leave comments on the floor plan or site map. Highlight areas of strength and challenge related to this question.",
+    placement: "right",
+  },
+  {
+    target: "view-toggle",
+    title: "Floor plan or site map",
+    body: "Toggle between the interior Floor Plan and the aerial Site Map so you can mark the spaces that matter for this question.",
+    placement: "bottom",
+  },
+  {
+    target: "tour-help",
+    title: "Want a fuller walkthrough?",
+    body: "Click Tour anytime for a complete guide to ratings, explanations, filters, floors, and navigating the survey.",
+    placement: "bottom",
+  },
+];
+
 export const QUESTION_TOUR_STEPS: TourStep[] = [
   {
     target: "progress-nav",

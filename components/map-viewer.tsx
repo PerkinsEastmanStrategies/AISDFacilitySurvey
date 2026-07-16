@@ -12,6 +12,7 @@ import {
 import { Layers, MapPin, X } from "lucide-react";
 import {
   annotationMatchesQuestionFilter,
+  getAnnotationPinLabel,
   SURVEY_QUESTIONS,
   type Annotation,
 } from "@/lib/survey-data";
@@ -649,8 +650,10 @@ export function MapViewer({
         cursor: pointer;
       `;
       const span = document.createElement("span");
-      span.textContent = String(a.questionId);
+      span.textContent = getAnnotationPinLabel(a.questionId);
       span.style.transform = "rotate(45deg)";
+      span.style.fontSize = "9px";
+      span.style.lineHeight = "1";
       el.appendChild(span);
 
       el.addEventListener("click", (ev) => {
@@ -899,13 +902,13 @@ export function MapViewer({
             <div className="mb-3 flex items-center justify-between">
               <div className="flex min-w-0 items-center gap-2">
                 <span
-                  className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${
+                  className={`inline-flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold text-white ${
                     editClassification === "strength"
                       ? "bg-emerald-600"
                       : "bg-rose-600"
                   }`}
                 >
-                  {activeMarker.questionId}
+                  {getAnnotationPinLabel(activeMarker.questionId)}
                 </span>
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-foreground">

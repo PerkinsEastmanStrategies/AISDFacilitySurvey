@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { FloorPlanViewer } from "./floor-plan-viewer";
 import { MapViewer } from "./map-viewer";
-import { SURVEY_QUESTIONS, PRIORITIZATION_CATEGORIES, DONT_KNOW_RATING, NA_RATING, isRatingScored, formatRatingDisplay, type SurveyData } from "@/lib/survey-data";
+import { SURVEY_QUESTIONS, PRIORITIZATION_CATEGORIES, DONT_KNOW_RATING, NA_RATING, isRatingScored, formatRatingDisplay, SURVEY_TITLE, type SurveyData } from "@/lib/survey-data";
 import type { SurveySubmissionPayload } from "@/lib/submit-survey";
 import { clearSurveyDraft } from "@/lib/survey-draft";
 import { getSchoolByName } from "@/lib/schools-data";
@@ -244,7 +244,7 @@ export function ReportView({
             <div className="flex items-center gap-3 mb-2">
               <Building2 className="h-8 w-8 text-primary" />
               <h1 className="text-3xl font-bold text-foreground">
-                Educational Suitability Assessment Report
+                {SURVEY_TITLE} Report
               </h1>
             </div>
             <p className="text-muted-foreground">
@@ -1009,7 +1009,8 @@ export function ReportView({
               Thanks for your response!
             </h3>
             <p className="mb-2 text-sm text-muted-foreground">
-              Your assessment for {data.school || "this school"} has been saved.
+              Your {SURVEY_TITLE} response for {data.school || "this school"}{" "}
+              has been saved.
             </p>
             {submissionId && (
               <p className="mb-6 font-mono text-xs text-muted-foreground">

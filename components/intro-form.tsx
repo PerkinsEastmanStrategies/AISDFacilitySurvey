@@ -18,10 +18,10 @@ import {
   loadManifestSchoolOptions,
   type ManifestSchoolOption,
 } from "@/lib/floor-plan-manifest";
-import type { SurveyRole } from "@/lib/survey-data";
+import { SURVEY_TITLE, type SurveyRole } from "@/lib/survey-data";
 import { isValidEmail } from "@/lib/submit-survey";
 import {
-  getDeferredSurveyNotice,
+  parsePopupNote,
   type DeferredSurveyNotice,
 } from "@/lib/deferred-survey-schools";
 
@@ -99,12 +99,16 @@ export function IntroForm({
 
   const handleChange = (field: keyof SchoolInfo, value: string) => {
     if (field === "school") {
-      const notice = getDeferredSurveyNotice(value);
+      const selected = manifestSchools?.find((school) => school.name === value);
+      const notice = parsePopupNote(selected?.popupNote);
       if (notice) {
         setDeferredNotice(notice);
-        // Do not keep a deferred campus selected — they cannot take the survey yet.
-        onChange({ ...data, school: "" });
-        return;
+        // Blocking notices (future modernization, not yet ready, etc.) cannot
+        // stay selected — same behavior as the original Andrews popup.
+        if (notice.blocksSurvey) {
+          onChange({ ...data, school: "" });
+          return;
+        }
       }
     }
     onChange({ ...data, [field]: value });
@@ -331,17 +335,18 @@ export function IntroForm({
           />
           <div className="relative w-full max-w-md overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
             <div className="space-y-3 px-5 py-5 sm:px-6 sm:py-6">
-              <p className="text-sm font-medium text-foreground">
-                Thank you for your interest in the Facility Suitability and
-                Condition Survey.
-              </p>
+              {deferredNotice.blocksSurvey && (
+                <p className="text-sm font-medium text-foreground">
+                  Thank you for your interest in the {SURVEY_TITLE}.
+                </p>
+              )}
               <h2
                 id="deferred-survey-title"
                 className="font-heading text-lg font-bold underline decoration-2 underline-offset-4 text-foreground"
               >
                 {deferredNotice.title}
               </h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground">Note:</span>{" "}
                 {deferredNotice.note}
               </p>

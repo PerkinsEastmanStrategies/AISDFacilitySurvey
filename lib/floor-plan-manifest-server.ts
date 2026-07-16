@@ -82,6 +82,7 @@ export function toManifestSchoolOptions(
       name: row.schoolName,
       label: row.updatedName || row.schoolName,
       hasFloorPlans: rowHasFloorPlans(row),
+      popupNote: row.popupNote,
     }))
     .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
 }

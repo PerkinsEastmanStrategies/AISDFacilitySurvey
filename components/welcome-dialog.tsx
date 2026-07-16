@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { MapPin, LayoutGrid } from "lucide-react";
+import { SURVEY_TITLE } from "@/lib/survey-data";
 
 const STORAGE_KEY = "aisd-survey-welcome-seen";
 
@@ -61,7 +62,7 @@ export function WelcomeDialog({ open, onClose }: WelcomeDialogProps) {
             Welcome
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Facility Suitability and Condition Survey
+            {SURVEY_TITLE}
           </p>
         </div>
 

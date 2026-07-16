@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import {
   annotationMatchesQuestionFilter,
+  getAnnotationPinLabel,
   SURVEY_QUESTIONS,
   type Annotation,
 } from "@/lib/survey-data";
@@ -778,7 +779,9 @@ export function FloorPlanViewer({
             transform: "rotate(-45deg)",
           }}
         >
-          <span style={{ transform: "rotate(45deg)" }}>{annotation.questionId}</span>
+          <span style={{ transform: "rotate(45deg)", fontSize: "9px", lineHeight: 1 }}>
+            {getAnnotationPinLabel(annotation.questionId)}
+          </span>
         </div>
       </div>
     );
@@ -840,7 +843,7 @@ export function FloorPlanViewer({
             fontSize="24"
             fontWeight="bold"
           >
-            {annotation.questionId}
+            {getAnnotationPinLabel(annotation.questionId)}
           </text>
         </svg>
       </div>

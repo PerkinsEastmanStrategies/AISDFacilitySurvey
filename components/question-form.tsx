@@ -39,6 +39,11 @@ interface QuestionFormProps {
    * and the explanation box: `prompt-rating` then tools then `explanation`.
    */
   parts?: QuestionFormParts;
+  /**
+   * When the parent panel already shows section + category, skip the duplicate
+   * meta header and lead with the statement text.
+   */
+  omitMetaHeader?: boolean;
   /** Where Mark Locations sits relative to the explanation for guide copy. */
   annotationToolsPosition?: "above" | "below";
 }
@@ -49,6 +54,7 @@ export function QuestionForm({
   onChange,
   compact = false,
   parts = "full",
+  omitMetaHeader = false,
   annotationToolsPosition = "above",
 }: QuestionFormProps) {
   const question = SURVEY_QUESTIONS.find((q) => q.id === questionId);
@@ -256,25 +262,33 @@ export function QuestionForm({
     <Card className="gap-2 border-border/60 py-2.5 shadow-sm">
       {(parts === "full" || parts === "prompt-rating") && (
         <CardHeader className="px-2.5 pb-1.5">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
-              {question.section}
-            </span>
-          </div>
-          <div className="mt-px flex items-center gap-1">
-            <Badge
-              style={{ backgroundColor: question.color }}
-              className="px-1.5 py-px text-[9px] text-white"
-            >
-              {question.category}
-            </Badge>
-            {questionCode && (
-              <Badge variant="outline" className="font-mono text-[9px]">
-                {questionCode}
-              </Badge>
-            )}
-          </div>
-          <CardTitle className="mt-1 font-sans text-xs font-bold leading-snug text-foreground">
+          {!omitMetaHeader && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  {question.section}
+                </span>
+              </div>
+              <div className="mt-px flex items-center gap-1">
+                <Badge
+                  style={{ backgroundColor: question.color }}
+                  className="px-1.5 py-px text-[9px] text-white"
+                >
+                  {question.category}
+                </Badge>
+                {questionCode && (
+                  <Badge variant="outline" className="font-mono text-[9px]">
+                    {questionCode}
+                  </Badge>
+                )}
+              </div>
+            </>
+          )}
+          <CardTitle
+            className={`font-sans text-xs font-bold leading-snug text-foreground ${
+              omitMetaHeader ? "" : "mt-1"
+            }`}
+          >
             {question.text}
           </CardTitle>
           {tip && (
@@ -294,7 +308,7 @@ export function QuestionForm({
             </Label>
             <p className="text-[11px] text-muted-foreground">
               Select categories in order of priority (first selected = highest).
-              Categories come from Educational Suitability questions 1–15.
+              Options match the Educational Suitability topic areas above.
             </p>
             <CategoryRanking
               categories={PRIORITIZATION_CATEGORIES}

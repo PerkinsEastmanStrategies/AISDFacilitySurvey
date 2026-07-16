@@ -16,11 +16,13 @@ import { pickDefaultFloor } from "@/lib/floor-plan-manifest";
 import { extractRoomsFromSvg, getSpaceColor, type RoomInfo } from "@/lib/spaces-data";
 import {
   getQuestionsForRole,
+  getQuestionNavLabel,
   FCA_LIKERT_SCALE_NOTE,
   isRatingAnswered,
   SCHOOL_LEADER_FCA_QUESTION_IDS,
   createEmptyResponses,
   mergeSurveyResponses,
+  SURVEY_TITLE,
   type SurveyData,
   type QuestionResponse,
   type Annotation,
@@ -44,6 +46,7 @@ import { AnnotationToolbar, type Tool, type Classification } from "@/components/
 import { GuidedTour } from "@/components/guided-tour";
 import {
   INTRO_TOUR_STEPS,
+  MINI_QUESTION_TOUR_STEPS,
   getQuestionTourSteps,
 } from "@/lib/guided-tour-steps";
 import { useIsMobile, usePrefersMobileFloorPlan } from "@/hooks/use-mobile";
@@ -64,7 +67,7 @@ import {
   type ManifestSchoolOption,
 } from "@/lib/floor-plan-manifest";
 import { isValidEmail, type SurveySubmissionPayload } from "@/lib/submit-survey";
-import { isDeferredSurveySchool } from "@/lib/deferred-survey-schools";
+import { parsePopupNote } from "@/lib/deferred-survey-schools";
 import Image from "next/image";
 
 type Step = SurveyStep;
@@ -81,7 +84,10 @@ type ActiveQuestion = ReturnType<typeof getQuestionsForRole>[number];
 type Panel = {
   kind: "question" | "category";
   section: string;
+  /** Full category / area name (panel header, tooltips). */
   label: string;
+  /** Short chip label for progress nav. */
+  navLabel: string;
   color: string;
   questions: ActiveQuestion[];
 };
@@ -143,6 +149,10 @@ export default function SurveyApp({
   const [activeFloorId, setActiveFloorId] = useState<string>("floor-1");
   const [floorPlanLoading, setFloorPlanLoading] = useState(false);
   const [runTour, setRunTour] = useState(false);
+  /** Auto first-question walkthrough vs full Tour button walkthrough. */
+  const [tourVariant, setTourVariant] = useState<"intro" | "mini" | "full">(
+    "intro"
+  );
   const [tourIntroSeen, setTourIntroSeen] = useState(false);
   const [tourQuestionsSeen, setTourQuestionsSeen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -262,6 +272,7 @@ export default function SurveyApp({
           kind: "category",
           section: q.section,
           label: category,
+          navLabel: category,
           color: q.color,
           questions: group,
         });
@@ -272,6 +283,7 @@ export default function SurveyApp({
           kind: "question",
           section: q.section,
           label: areaLabel || q.category,
+          navLabel: getQuestionNavLabel(q),
           color: q.color,
           questions: [q],
         });
@@ -531,7 +543,16 @@ export default function SurveyApp({
   );
 
   const activeTourSteps =
-    step === "intro" ? INTRO_TOUR_STEPS : questionTourSteps;
+    tourVariant === "intro"
+      ? INTRO_TOUR_STEPS
+      : tourVariant === "mini"
+        ? MINI_QUESTION_TOUR_STEPS
+        : questionTourSteps;
+
+  const startTour = (variant: "intro" | "mini" | "full") => {
+    setTourVariant(variant);
+    setRunTour(true);
+  };
 
   useEffect(() => {
     if (!hasSeenWelcome()) setShowWelcome(true);
@@ -548,8 +569,9 @@ export default function SurveyApp({
 
   useEffect(() => {
     if (!isMobile) return;
+    // Still skip the long intro auto-tour on phones; the short questions
+    // mini-tour below is allowed so annotation guidance still appears.
     setTourIntroSeen(true);
-    setTourQuestionsSeen(true);
     setRunTour(false);
   }, [isMobile]);
 
@@ -557,18 +579,69 @@ export default function SurveyApp({
     // Auto-tours fight with mobile scrolling and can stress the viewer; skip them.
     if (isMobile || !draftReady) return;
     if (step !== "intro" || tourIntroSeen || showWelcome) return;
-    setTourIntroSeen(true);
-    const timer = window.setTimeout(() => setRunTour(true), 450);
+    // Mark seen only when the tour actually starts so React Strict Mode
+    // remounts do not cancel the scheduled auto-tour permanently.
+    const timer = window.setTimeout(() => {
+      setTourIntroSeen(true);
+      startTour("intro");
+    }, 450);
     return () => window.clearTimeout(timer);
   }, [step, tourIntroSeen, showWelcome, isMobile, draftReady]);
 
   useEffect(() => {
-    if (isMobile || !draftReady) return;
+    if (!draftReady) return;
     if (step !== "questions" || tourQuestionsSeen) return;
-    setTourQuestionsSeen(true);
-    const timer = window.setTimeout(() => setRunTour(true), 450);
-    return () => window.clearTimeout(timer);
-  }, [step, tourQuestionsSeen, isMobile, draftReady]);
+    // Resume mid-survey: skip the mini tour rather than showing it later.
+    if (currentPanelIndex !== 0) {
+      setTourQuestionsSeen(true);
+      return;
+    }
+    // Only auto-run on the first rating panel (ESA or FCA).
+    if (isSpacesQuestion || isRankingPanel || isTextPanel) {
+      setTourQuestionsSeen(true);
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+    let pollTimer: number | undefined;
+    let startTimer: number | undefined;
+
+    const tryStartMiniTour = () => {
+      if (cancelled) return;
+      // Annotation toolbar is required; view-toggle exists on desktop and in
+      // the expanded mobile viewer (tour can still center if missing).
+      const toolbar = document.querySelector('[data-tour="annotation-toolbar"]');
+      if (toolbar) {
+        setTourQuestionsSeen(true);
+        // Ensure floor plan / map chrome is visible so step 2 can highlight it.
+        setMobileViewerOpen(true);
+        startTour("mini");
+        return;
+      }
+      attempts += 1;
+      if (attempts > 40) {
+        setTourQuestionsSeen(true);
+        return;
+      }
+      pollTimer = window.setTimeout(tryStartMiniTour, 150);
+    };
+
+    startTimer = window.setTimeout(tryStartMiniTour, 400);
+    return () => {
+      cancelled = true;
+      if (startTimer) window.clearTimeout(startTimer);
+      if (pollTimer) window.clearTimeout(pollTimer);
+    };
+  }, [
+    step,
+    tourQuestionsSeen,
+    draftReady,
+    currentPanelIndex,
+    isSpacesQuestion,
+    isRankingPanel,
+    isTextPanel,
+  ]);
 
   const handleSubmitSurvey = async () => {
     if (isSubmitting || submissionId) return;
@@ -675,9 +748,13 @@ export default function SurveyApp({
 
   const canProceed = () => {
     if (step === "intro") {
+      const selectedSchool = initialSchools.find(
+        (school) => school.name === surveyData.school
+      );
+      const popup = parsePopupNote(selectedSchool?.popupNote);
       return Boolean(
         surveyData.school &&
-          !isDeferredSurveySchool(surveyData.school) &&
+          !(popup?.blocksSurvey) &&
           surveyData.role &&
           surveyData.positionTitle.trim() &&
           surveyData.principalName.trim() &&
@@ -915,8 +992,7 @@ export default function SurveyApp({
             Thank you
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your Educational Suitability and Facility Condition Survey has been
-            submitted successfully.
+            Your {SURVEY_TITLE} has been submitted successfully.
           </p>
           {submissionId && (
             <p className="mt-4 text-xs text-muted-foreground">
@@ -947,7 +1023,7 @@ export default function SurveyApp({
             <div className="hidden h-5 w-px bg-border/60 sm:block md:h-7" />
             <div className="min-w-0">
               <h1 className="truncate font-sans text-xs font-semibold tracking-tight text-foreground sm:text-sm">
-                Educational Suitability and Facility Condition Survey
+                {SURVEY_TITLE}
               </h1>
               <p className="hidden text-[10px] text-muted-foreground sm:block">
                 Facility Planning &amp; Capital Assessment
@@ -967,7 +1043,8 @@ export default function SurveyApp({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setRunTour(true)}
+                  data-tour="tour-help"
+                  onClick={() => startTour("full")}
                   className="hidden h-6 gap-0.5 text-[11px] sm:ml-2 sm:flex"
                 >
                   <HelpCircle className="h-3 w-3" />
@@ -979,7 +1056,8 @@ export default function SurveyApp({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setRunTour(true)}
+                data-tour="tour-help"
+                onClick={() => startTour("intro")}
                 className="hidden h-6 gap-0.5 text-[11px] sm:ml-2 sm:flex"
               >
                 <HelpCircle className="h-3 w-3" />
@@ -997,7 +1075,8 @@ export default function SurveyApp({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setRunTour(true)}
+                data-tour="tour-help"
+                onClick={() => startTour("full")}
                 className="h-6 px-1"
                 aria-label="Take a tour"
               >
@@ -1008,7 +1087,8 @@ export default function SurveyApp({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setRunTour(true)}
+                data-tour="tour-help"
+                onClick={() => startTour("intro")}
                 className="h-6 px-1"
                 aria-label="Take a tour"
               >
@@ -1022,7 +1102,7 @@ export default function SurveyApp({
       {/* Main Content */}
       <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
         {/* Left Panel - Survey Form */}
-        <div className="flex min-h-0 w-full flex-col border-b border-border/60 bg-card md:w-[28%] md:max-w-md md:border-b-0 md:border-r lg:w-[26%]">
+        <div className="flex min-h-0 w-full flex-col border-b border-border/60 bg-card md:w-[36%] md:max-w-xl md:border-b-0 md:border-r lg:w-[34%]">
           <ScrollArea className="min-h-0 flex-1 overscroll-contain">
             <div className="space-y-2.5 p-2">
               {step === "intro" ? (
@@ -1108,26 +1188,14 @@ export default function SurveyApp({
                                   return r && isRatingAnswered(r.rating);
                                 });
                                 const isCurrent = idx === currentPanelIndex;
-                                // Category panels show the category name; single
-                                // question panels show their sequence number.
-                                const chipLabel =
-                                  p.kind === "category"
-                                    ? p.label
-                                    : String(
-                                        panels
-                                          .slice(0, idx + 1)
-                                          .filter(
-                                            (pp) =>
-                                              pp.section === section &&
-                                              pp.kind === "question"
-                                          ).length
-                                      );
+                                // Category-style chips for every panel (short
+                                // navLabel for ESA so the strip stays scannable).
                                 return (
                                   <button
                                     key={`${section}-${idx}`}
                                     onClick={() => setCurrentPanelIndex(idx)}
                                     title={p.label}
-                                    className={`flex h-6 min-w-6 items-center justify-center rounded px-1.5 text-[11px] font-medium transition-all ${
+                                    className={`flex h-6 max-w-[6.75rem] items-center justify-center truncate rounded px-1.5 text-[10px] font-medium transition-all ${
                                       isCurrent
                                         ? "scale-105 bg-primary text-primary-foreground shadow-sm"
                                         : isComplete
@@ -1135,7 +1203,12 @@ export default function SurveyApp({
                                         : "bg-muted text-muted-foreground hover:bg-muted-foreground/20"
                                     }`}
                                   >
-                                    {chipLabel}
+                                    <span
+                                      className="mr-1 inline-block h-1.5 w-1.5 shrink-0 rounded-full"
+                                      style={{ backgroundColor: p.color }}
+                                      aria-hidden
+                                    />
+                                    <span className="truncate">{p.navLabel}</span>
                                   </button>
                                 );
                               })}
@@ -1238,13 +1311,43 @@ export default function SurveyApp({
                           </StepSection>
                         </div>
                       ) : isRankingPanel || isTextPanel ? (
-                        <QuestionForm
-                          questionId={currentQuestion.id}
-                          response={currentResponse}
-                          onChange={handleResponseChange}
-                        />
+                        <div className="space-y-3">
+                          <div className="space-y-0.5">
+                            <Badge
+                              style={{ backgroundColor: currentPanel.color }}
+                              className="px-1.5 py-px text-[9px] text-white"
+                            >
+                              {currentPanel.section}
+                            </Badge>
+                            <h2 className="font-sans text-sm font-bold text-foreground">
+                              {currentPanel.label}
+                            </h2>
+                          </div>
+                          <QuestionForm
+                            questionId={currentQuestion.id}
+                            response={currentResponse}
+                            onChange={handleResponseChange}
+                            omitMetaHeader
+                          />
+                        </div>
                       ) : (
                         <div className="space-y-3">
+                          <div className="space-y-0.5">
+                            <Badge
+                              style={{ backgroundColor: currentPanel.color }}
+                              className="px-1.5 py-px text-[9px] text-white"
+                            >
+                              {currentPanel.section}
+                            </Badge>
+                            <h2 className="font-sans text-sm font-bold text-foreground">
+                              {currentPanel.label}
+                            </h2>
+                            <p className="text-[11px] text-muted-foreground">
+                              {currentPanel.section === "Facility Condition"
+                                ? FCA_LIKERT_SCALE_NOTE
+                                : "Rate this statement from 1 (Strongly Disagree) to 5 (Strongly Agree)."}
+                            </p>
+                          </div>
                           <StepSection
                             letter="A"
                             title={
@@ -1259,6 +1362,7 @@ export default function SurveyApp({
                               response={currentResponse}
                               onChange={handleResponseChange}
                               parts="prompt-rating"
+                              omitMetaHeader
                             />
                           </StepSection>
                           <StepSection
@@ -1414,7 +1518,7 @@ export default function SurveyApp({
       </div>
 
       <GuidedTour
-        key={step}
+        key={`${step}-${tourVariant}`}
         steps={activeTourSteps}
         run={runTour}
         onClose={() => setRunTour(false)}

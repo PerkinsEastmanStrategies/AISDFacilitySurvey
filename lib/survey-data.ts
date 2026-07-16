@@ -1,8 +1,14 @@
+/** Full public name shown in headers, pop-ups, and browser title. */
+export const SURVEY_TITLE =
+  "Facility Condition and Educational Suitability Survey";
+
 export const SURVEY_QUESTIONS = [
   {
     id: 1,
     text: "The studios and instructional spaces effectively support the teaching methods and learning experiences expected for today's students.",
     category: "Learning Environment",
+    /** Short label for progress chips (avoids crowding long category names). */
+    navLabel: "Learning",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(220, 70%, 50%)",
@@ -11,6 +17,7 @@ export const SURVEY_QUESTIONS = [
     id: 2,
     text: "The facility effectively supports the educational programs offered at this school, including specialty programs (e.g., STEM, dual language).",
     category: "Educational Program Alignment",
+    navLabel: "Programs",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(160, 60%, 45%)",
@@ -19,6 +26,7 @@ export const SURVEY_QUESTIONS = [
     id: 3,
     text: "The school's studios and other learning spaces can be easily adapted to accommodate different teaching approaches, group sizes, and learning activities.",
     category: "Flexibility of Spaces",
+    navLabel: "Flexibility",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(280, 60%, 50%)",
@@ -27,6 +35,7 @@ export const SURVEY_QUESTIONS = [
     id: 4,
     text: "The facility effectively supports student collaboration, project-based learning, and small group instruction in spaces outside of studios.",
     category: "Collaboration Opportunities",
+    navLabel: "Collaboration",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(30, 80%, 50%)",
@@ -35,6 +44,7 @@ export const SURVEY_QUESTIONS = [
     id: 5,
     text: "The facility provides appropriate spaces for special education (SPED), intervention services, counseling, and other student support functions.",
     category: "Student Support Services",
+    navLabel: "Support",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(340, 70%, 50%)",
@@ -43,6 +53,7 @@ export const SURVEY_QUESTIONS = [
     id: 6,
     text: "The layout and organization of the campus and grounds allow staff to effectively supervise students and maintain a safe learning environment.",
     category: "Safety and Supervision",
+    navLabel: "Safety",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(200, 70%, 45%)",
@@ -51,6 +62,7 @@ export const SURVEY_QUESTIONS = [
     id: 7,
     text: "Spaces such as the library, cafeteria, gymnasium, and multipurpose areas effectively support student and school needs.",
     category: "Common Areas and Shared Spaces",
+    navLabel: "Common Areas",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(45, 80%, 45%)",
@@ -59,6 +71,7 @@ export const SURVEY_QUESTIONS = [
     id: 8,
     text: "The facility effectively supports community programming, after-hours activities, or extended-day use.",
     category: "Community / After-Hours Use",
+    navLabel: "Community",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(20, 70%, 50%)",
@@ -67,6 +80,7 @@ export const SURVEY_QUESTIONS = [
     id: 9,
     text: "The school's outdoor spaces, such as play, athletics, and outdoor learning areas effectively support programming and student needs.",
     category: "Outdoor Spaces",
+    navLabel: "Outdoors",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(140, 55%, 42%)",
@@ -75,6 +89,7 @@ export const SURVEY_QUESTIONS = [
     id: 10,
     text: "The campus appropriately accommodates arrival/drop-off and dismissal/pickup for students and families, including SPED.",
     category: "Arrival and Dismissal",
+    navLabel: "Arrival",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(300, 50%, 50%)",
@@ -83,6 +98,7 @@ export const SURVEY_QUESTIONS = [
     id: 11,
     text: "The facility effectively supports current instructional technology, including connectivity, power access, and digital learning tools.",
     category: "Technology Readiness",
+    navLabel: "Technology",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(180, 60%, 45%)",
@@ -91,6 +107,7 @@ export const SURVEY_QUESTIONS = [
     id: 12,
     text: "The facility's acoustics effectively support teaching, learning, and daily operations.",
     category: "Acoustics",
+    navLabel: "Acoustics",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(260, 60%, 50%)",
@@ -99,6 +116,7 @@ export const SURVEY_QUESTIONS = [
     id: 13,
     text: "The facility provides sufficient workspace and collaboration areas for teachers, administrators, and support staff.",
     category: "Staff Workspace and Collaboration",
+    navLabel: "Staff Space",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(90, 50%, 45%)",
@@ -107,6 +125,7 @@ export const SURVEY_QUESTIONS = [
     id: 14,
     text: "The physical design of the campus supports the day-to-day cleaning and maintenance needs of the building.",
     category: "Custodial and Maintenance",
+    navLabel: "Custodial",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(15, 65%, 52%)",
@@ -115,6 +134,7 @@ export const SURVEY_QUESTIONS = [
     id: 15,
     text: "The food service facilities, including the kitchen, dining areas, and serving spaces, effectively support daily operations and student needs.",
     category: "Food Service",
+    navLabel: "Food Service",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(25, 70%, 48%)",
@@ -123,6 +143,7 @@ export const SURVEY_QUESTIONS = [
     id: 16,
     text: "Overall, the facility effectively supports the school's educational vision, instructional goals, and student success.",
     category: "Overall Educational Suitability",
+    navLabel: "Overall",
     section: "Educational Suitability",
     type: "rating",
     color: "hsl(120, 50%, 45%)",
@@ -131,6 +152,7 @@ export const SURVEY_QUESTIONS = [
     id: 17,
     text: "What are your top 3 safety and security priorities for this campus?",
     category: "Safety and Security Priorities",
+    navLabel: "Priorities",
     section: "Educational Suitability",
     type: "text",
     color: "hsl(0, 70%, 45%)",
@@ -139,6 +161,7 @@ export const SURVEY_QUESTIONS = [
     id: 18,
     text: "Looking ahead over the next 5 years, please rank your top 5 large-scale facility modernization projects in order of priority.",
     category: "Campus Improvement Priorities",
+    navLabel: "Ranking",
     section: "Educational Suitability",
     type: "ranking",
     color: "hsl(220, 15%, 40%)",
@@ -642,6 +665,32 @@ export const PRIORITIZATION_CATEGORIES: string[] = SURVEY_QUESTIONS.filter(
 export const MAX_PRIORITIES = 5;
 
 export type SurveyQuestion = (typeof SURVEY_QUESTIONS)[number];
+
+/** Compact label for progress chips — prefers `navLabel` when set. */
+export function getQuestionNavLabel(question: SurveyQuestion): string {
+  if ("navLabel" in question && typeof question.navLabel === "string") {
+    return question.navLabel;
+  }
+  if ("area" in question && typeof question.area === "string") {
+    return question.area;
+  }
+  return question.category;
+}
+
+/**
+ * Short marker text for map / floor-plan pins.
+ * Prefer question codes (FCA) or a tight abbreviation of the ESA nav label.
+ */
+export function getAnnotationPinLabel(questionId: number): string {
+  const question = SURVEY_QUESTIONS.find((q) => q.id === questionId);
+  if (!question) return String(questionId);
+  if ("questionCode" in question && typeof question.questionCode === "string") {
+    return question.questionCode;
+  }
+  const nav = getQuestionNavLabel(question);
+  const word = nav.split(/\s+/)[0] ?? nav;
+  return word.length <= 5 ? word : word.slice(0, 4);
+}
 
 /**
  * Returns the questions a given role should answer.

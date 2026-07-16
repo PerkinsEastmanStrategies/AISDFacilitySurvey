@@ -42,21 +42,27 @@ export interface FloorPlanManifestRow {
   classCode: string;
   campusId: string;
   floors: Partial<Record<FloorLevelId, string>>;
+  /**
+   * Raw text from sheet column `Popup up note` (or similar).
+   * Empty / "N" / "n" means no popup; other values show a campus notice.
+   */
+  popupNote?: string;
 }
 
 let manifestCache: FloorPlanManifestRow[] | null = null;
 let manifestLoadPromise: Promise<FloorPlanManifestRow[]> | null = null;
 let manifestLoadedSuccessfully = false;
 
-function parseCsvLine(line: string): string[] {
-  const values: string[] = [];
+function parseCsvRows(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
   let current = "";
   let inQuotes = false;
 
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
     if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
+      if (inQuotes && text[i + 1] === '"') {
         current += '"';
         i++;
       } else {
@@ -65,27 +71,34 @@ function parseCsvLine(line: string): string[] {
       continue;
     }
     if (char === "," && !inQuotes) {
-      values.push(current);
+      row.push(current);
+      current = "";
+      continue;
+    }
+    if ((char === "\n" || char === "\r") && !inQuotes) {
+      if (char === "\r" && text[i + 1] === "\n") i++;
+      row.push(current);
+      if (row.some((cell) => cell.trim())) rows.push(row);
+      row = [];
       current = "";
       continue;
     }
     current += char;
   }
 
-  values.push(current);
-  return values;
+  if (current.length > 0 || row.length > 0) {
+    row.push(current);
+    if (row.some((cell) => cell.trim())) rows.push(row);
+  }
+
+  return rows;
 }
 
 export function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
-  const lines = csvText
-    .replace(/^\uFEFF/, "")
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+  const table = parseCsvRows(csvText.replace(/^\uFEFF/, ""));
+  if (table.length < 2) return [];
 
-  if (lines.length < 2) return [];
-
-  const headers = parseCsvLine(lines[0]).map((header) => header.trim());
+  const headers = table[0].map((header) => header.trim());
   const schoolNameIndex = headers.indexOf("school_name");
   if (schoolNameIndex === -1) return [];
 
@@ -95,6 +108,9 @@ export function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
   const updatedNameIndex = headers.findIndex(
     (header) => header.toLowerCase() === "updatedname"
   );
+  const popupNoteIndex = headers.findIndex((header) =>
+    /popup/i.test(header)
+  );
   const floorColumnIndexes = FLOOR_LEVELS.map((level) => ({
     id: level.id,
     index: headers.indexOf(level.column),
@@ -102,8 +118,7 @@ export function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
 
   const rows: FloorPlanManifestRow[] = [];
 
-  for (const line of lines.slice(1)) {
-    const cells = parseCsvLine(line);
+  for (const cells of table.slice(1)) {
     const schoolName = cells[schoolNameIndex]?.trim();
     if (!schoolName) continue;
 
@@ -118,6 +133,8 @@ export function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
       updatedNameIndex === -1
         ? ""
         : cells[updatedNameIndex]?.trim() ?? "";
+    const popupNote =
+      popupNoteIndex === -1 ? "" : cells[popupNoteIndex]?.trim() ?? "";
 
     rows.push({
       schoolName,
@@ -127,6 +144,7 @@ export function parseManifestCsv(csvText: string): FloorPlanManifestRow[] {
       classCode: classCodeIndex === -1 ? "" : cells[classCodeIndex]?.trim() ?? "",
       campusId: campusIdIndex === -1 ? "" : cells[campusIdIndex]?.trim() ?? "",
       floors,
+      popupNote: popupNote || undefined,
     });
   }
 
@@ -246,6 +264,8 @@ export interface ManifestSchoolOption {
   /** Friendly label from sheet `UpdatedName`. */
   label: string;
   hasFloorPlans: boolean;
+  /** Raw `Popup up note` from the sheet when present and not N/n. */
+  popupNote?: string;
 }
 
 /** Schools listed in the floor plan manifest, in sheet order. Empty if unavailable. */
@@ -260,6 +280,7 @@ export async function loadManifestSchoolOptions(): Promise<
       name: row.schoolName,
       label: row.updatedName || row.schoolName,
       hasFloorPlans: rowHasFloorPlans(row),
+      popupNote: row.popupNote,
     }))
     .sort((a, b) =>
       a.label.localeCompare(b.label, undefined, { sensitivity: "base" })

@@ -48,9 +48,17 @@ export function GuidedTour({ steps, run, onClose }: GuidedTourProps) {
 
   const measure = useCallback(() => {
     if (!run || !step) return;
-    const el = document.querySelector<HTMLElement>(
-      `[data-tour="${step.target}"]`
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLElement>(`[data-tour="${step.target}"]`)
     );
+    // Prefer a visible target when the same control exists in desktop + mobile chrome.
+    const el =
+      candidates.find((node) => {
+        const style = window.getComputedStyle(node);
+        if (style.display === "none" || style.visibility === "hidden") return false;
+        const r = node.getBoundingClientRect();
+        return r.width > 0 && r.height > 0;
+      }) ?? candidates[0];
     if (!el) {
       setRect(null);
       return;

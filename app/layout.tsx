@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
+import { SURVEY_TITLE } from '@/lib/survey-data'
 import './globals.css'
 
 const inter = Inter({ 
@@ -9,8 +10,8 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'Educational Suitability and Facility Condition Survey',
-  description: 'Facility planning and capital assessment survey for school districts',
+  title: SURVEY_TITLE,
+  description: `${SURVEY_TITLE} for Austin ISD school campuses`,
   generator: 'v0.app',
   icons: {
     icon: [
