@@ -66,7 +66,7 @@ export function getSupabaseFloorPlanUrl(buildingName: string): string | null {
 const svgCache = new Map<string, string>();
 const svgInflight = new Map<string, Promise<string | null>>();
 /** Bump when floor-plan fetch rules change so stale Cache API entries are ignored. */
-const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v4";
+const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v5";
 
 /**
  * True when an SVG includes architectural (or room-boundary) geometry — not
