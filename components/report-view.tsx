@@ -82,7 +82,7 @@ export function ReportView({
 
       if (!data.school) {
         setAvailableFloors([]);
-        setReportSvgContent(data.svgContent);
+        setReportSvgContent(null);
         return;
       }
 
@@ -97,11 +97,11 @@ export function ReportView({
       if (initialFloor) {
         const svg = await fetchFloorPlanSvgByFilename(
           initialFloor.filename,
-          data.svgContent,
+          null,
           { preferMobile }
         );
         if (!cancelled) setReportSvgContent(svg);
-        if (!preferMobile) {
+        if (svg && !preferMobile) {
           prefetchFloorPlanSvgs(
             floors
               .filter((floor) => floor.id !== initialFloor.id)
@@ -110,7 +110,7 @@ export function ReportView({
           );
         }
       } else if (!cancelled) {
-        setReportSvgContent(data.svgContent);
+        setReportSvgContent(null);
       }
 
       if (!cancelled) setFloorPlanLoading(false);
@@ -130,13 +130,13 @@ export function ReportView({
       setFloorPlanLoading(true);
       const svg = await fetchFloorPlanSvgByFilename(
         floor.filename,
-        data.svgContent,
+        null,
         { preferMobile }
       );
       setReportSvgContent(svg);
       setFloorPlanLoading(false);
     },
-    [availableFloors, data.svgContent, preferMobile]
+    [availableFloors, preferMobile]
   );
 
   const completedResponses = data.responses.filter((r) => isRatingScored(r.rating));

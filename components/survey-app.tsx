@@ -128,11 +128,9 @@ function StepSection({
 }
 
 export default function SurveyApp({
-  defaultSvg,
   initialManifest = [],
   initialSchools = [],
 }: {
-  defaultSvg: string;
   initialManifest?: FloorPlanManifestRow[];
   initialSchools?: ManifestSchoolOption[];
 }) {
@@ -185,7 +183,7 @@ export default function SurveyApp({
     specialEducation: "",
     responses: createEmptyResponses(),
     annotations: [],
-    svgContent: defaultSvg,
+    svgContent: null,
     spaceAssignments: {},
   });
 
@@ -195,7 +193,13 @@ export default function SurveyApp({
     if (draft) {
       setStep(draft.step);
       setCurrentPanelIndex(draft.currentPanelIndex);
-      setRightView(draft.rightView);
+      // Never restore floor-plan view without a campus — that used to show the
+      // generic placeholder plan on the intro screen.
+      setRightView(
+        draft.surveyData.school && draft.rightView === "floorplan"
+          ? "floorplan"
+          : "map"
+      );
       setActiveFloorId(draft.activeFloorId);
       setSurveyData((prev) => ({
         ...draft.surveyData,
@@ -375,17 +379,16 @@ export default function SurveyApp({
     setAnnotationFilterMode("current");
   }, [currentPanelIndex]);
 
-  // Force the floor plan into view for the spaces question (room placement
-  // only happens on the plan, not the map).
+  // Force the floor plan into view for the spaces question only when a plan exists.
   useEffect(() => {
-    if (isSpacesQuestion) {
+    if (isSpacesQuestion && surveyData.svgContent) {
       setRightView("floorplan");
       setMobileViewerOpen(true);
     }
-  }, [isSpacesQuestion]);
+  }, [isSpacesQuestion, surveyData.svgContent]);
 
-  // Load floor plan manifest + default floor when a school is selected.
-  // On phones/tablets, prefer `*.mobile.svg` when present; desktop keeps the full plan.
+  // Load floor plan when a school is selected. Never fall back to the generic
+  // placeholder plan — use the site map until a real campus SVG is available.
   useEffect(() => {
     let cancelled = false;
 
@@ -396,8 +399,9 @@ export default function SurveyApp({
         setAvailableFloors([]);
         setActiveFloorId("floor-1");
         setFloorPlanLoading(false);
+        setRightView("map");
         setSurveyData((prev) =>
-          prev.svgContent === defaultSvg ? prev : { ...prev, svgContent: defaultSvg }
+          prev.svgContent === null ? prev : { ...prev, svgContent: null }
         );
         return;
       }
@@ -411,14 +415,13 @@ export default function SurveyApp({
       setFloorPlanLoading(true);
 
       const svg = initialFloor
-        ? await fetchFloorPlanSvgByFilename(initialFloor.filename, defaultSvg, {
+        ? await fetchFloorPlanSvgByFilename(initialFloor.filename, null, {
             preferMobile,
           })
-        : defaultSvg;
+        : null;
       if (cancelled) return;
 
-      // Prefetching every floor doubles memory; skip on phones/tablets.
-      if (!preferMobile) {
+      if (svg && !preferMobile) {
         prefetchFloorPlanSvgs(
           floors
             .filter((floor) => floor.id !== initialFloor?.id)
@@ -436,6 +439,7 @@ export default function SurveyApp({
           annotations: prev.annotations.filter((a) => a.view === "map"),
         };
       });
+      setRightView(svg ? "floorplan" : "map");
       setFloorPlanLoading(false);
     }
 
@@ -444,7 +448,7 @@ export default function SurveyApp({
       cancelled = true;
       setFloorPlanLoading(false);
     };
-  }, [surveyData.school, defaultSvg, floorPlanDeviceReady, preferMobile]);
+  }, [surveyData.school, floorPlanDeviceReady, preferMobile]);
 
   const handleFloorChange = useCallback(
     async (floorId: string) => {
@@ -453,13 +457,14 @@ export default function SurveyApp({
 
       setActiveFloorId(floorId);
       setFloorPlanLoading(true);
-      const svg = await fetchFloorPlanSvgByFilename(floor.filename, defaultSvg, {
+      const svg = await fetchFloorPlanSvgByFilename(floor.filename, null, {
         preferMobile,
       });
       setSurveyData((prev) => ({ ...prev, svgContent: svg }));
+      if (!svg) setRightView("map");
       setFloorPlanLoading(false);
     },
-    [availableFloors, defaultSvg, preferMobile]
+    [availableFloors, preferMobile]
   );
 
   const selectedSchool = getSchoolByName(surveyData.school);
@@ -836,6 +841,8 @@ export default function SurveyApp({
             ? `Annotate areas related to: ${currentPanel.label}`
             : `Drop pins on the map related to: ${currentPanel.label}`;
 
+  const hasFloorPlan = Boolean(surveyData.svgContent);
+
   const renderViewToggle = (compact = false) => (
     <div
       data-tour="view-toggle"
@@ -843,8 +850,14 @@ export default function SurveyApp({
     >
       <button
         type="button"
-        onClick={() => setRightView("floorplan")}
-        className={`flex flex-1 items-center justify-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+        onClick={() => hasFloorPlan && setRightView("floorplan")}
+        disabled={!hasFloorPlan}
+        title={
+          hasFloorPlan
+            ? "Show floor plan"
+            : "Select a school with a floor plan to enable this view"
+        }
+        className={`flex flex-1 items-center justify-center gap-0.5 px-1.5 py-0.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
           rightView === "floorplan"
             ? "bg-primary text-primary-foreground"
             : "text-foreground hover:bg-muted"

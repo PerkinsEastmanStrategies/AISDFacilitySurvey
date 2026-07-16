@@ -1186,7 +1186,7 @@ export function FloorPlanViewer({
               {loadingMessage ??
                 (isLoading || svgContent
                   ? "Loading floor plan…"
-                  : "Select a school to load its floor plan.")}
+                  : "No floor plan available — use the Site Map instead.")}
             </p>
             {(isLoading || svgContent) && svgContent && svgContent.length >= LARGE_SVG_CHAR_THRESHOLD && (
               <p className="max-w-xs text-xs text-muted-foreground/80">
