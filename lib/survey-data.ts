@@ -132,7 +132,7 @@ export const SURVEY_QUESTIONS = [
   },
   {
     id: 14,
-    text: "The physical design of the campus supports the day-to-day cleaning and maintenance needs of the building.",
+    text: "The layout, design, and building materials (e.g., flooring, wall surfaces) support the day-to-day cleaning and maintenance needs of the campus.",
     category: "Custodial and Maintenance",
     navLabel: "Custodial",
     section: "Educational Suitability",
@@ -518,18 +518,30 @@ export const SURVEY_QUESTIONS = [
     color: "hsl(280, 60%, 50%)",
   },
   // School Leader (principal) simplified facility condition questions —
-  // seven combined prompts covering every Operations FCA category.
+  // a general campus overview, then combined prompts covering Operations FCA categories.
   // Each is its own step (like Educational Suitability), not a category group.
+  {
+    id: 61,
+    questionCode: "P0",
+    text: "Overall, the physical condition of this campus is good and supports daily school operations.",
+    category: "General",
+    area: "Overall Campus",
+    section: "Facility Condition",
+    type: "rating",
+    color: "hsl(15, 75%, 50%)",
+    tip: "Consider the campus as a whole — buildings, site, and major systems — before rating the more specific areas that follow.",
+    navLabel: "Overall",
+  },
   {
     id: 54,
     questionCode: "P1",
-    text: "Parking lots, drives, sidewalks, drainage, and outdoor activity areas (playgrounds, fields, courtyards) are in good physical condition and safe for daily use.",
+    text: "Parking lots, drives, sidewalks, drainage, and outdoor activity areas (playgrounds, fields, courtyards) are in good physical condition and safe for daily use, without recurring site flooding.",
     category: "Site & Grounds",
     area: "Site & Grounds",
     section: "Facility Condition",
     type: "rating",
     color: "hsl(95, 50%, 42%)",
-    tip: "Think about potholes, uneven pavement, standing water, muddy spots, erosion, and the condition of play/athletic areas and arrival zones.",
+    tip: "Think about potholes, uneven pavement, standing water, site flooding after rain, muddy spots, erosion, and the condition of play/athletic areas and arrival zones.",
   },
   {
     id: 55,
@@ -600,7 +612,9 @@ export const SURVEY_QUESTIONS = [
 ] as const;
 
 /** Simplified Facility Condition questions shown only to School Leaders. */
-export const SCHOOL_LEADER_FCA_QUESTION_IDS = new Set([54, 55, 56, 57, 58, 59, 60]);
+export const SCHOOL_LEADER_FCA_QUESTION_IDS = new Set([
+  61, 54, 55, 56, 57, 58, 59, 60,
+]);
 
 /** Sentinel rating for FCA "I don't know" — counts as answered but excluded from scoring. */
 export const DONT_KNOW_RATING = -1;
@@ -706,7 +720,7 @@ export function isQuestionResponseComplete(
 
 /**
  * Returns the questions a given role should answer.
- * - School Leaders: Educational Suitability + seven combined Campus Condition prompts.
+ * - School Leaders: Educational Suitability + campus condition prompts (general overview + key facility categories).
  * - Operations Staff: the full Facility Condition (FCA) question set only.
  */
 export function getQuestionsForRole(role: SurveyData["role"]): SurveyQuestion[] {

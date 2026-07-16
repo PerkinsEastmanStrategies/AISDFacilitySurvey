@@ -10,7 +10,7 @@ export const INTRO_TOUR_STEPS: TourStep[] = [
   {
     target: "role-select",
     title: "Choose your role",
-    body: "School Leaders complete Educational Suitability plus seven campus condition questions covering key facility categories. Operations Staff complete only the detailed Facility Condition (FCA) questions.",
+    body: "School Leaders complete Educational Suitability plus campus condition questions covering overall campus condition and key facility categories. Operations Staff complete only the detailed Facility Condition (FCA) questions.",
     placement: "right",
   },
   {
