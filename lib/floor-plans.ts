@@ -40,6 +40,34 @@ export function toMobileFloorPlanFilename(filename: string): string {
   return filename.replace(/\.svg$/i, ".mobile.svg");
 }
 
+/** Schools that always load `*.mobile.svg` from storage, including on desktop. */
+const MOBILE_ONLY_FLOOR_PLAN_SCHOOLS = new Set(["EASTSIDE ECHS"]);
+
+function normalizeSchoolKey(school: string): string {
+  return school.trim().toUpperCase();
+}
+
+export function schoolUsesMobileOnlyFloorPlans(school: string): boolean {
+  return MOBILE_ONLY_FLOOR_PLAN_SCHOOLS.has(normalizeSchoolKey(school));
+}
+
+export type FloorPlanFetchOptions = {
+  preferMobile?: boolean;
+  /** When true, load only the mobile SVG — no fallback to the full desktop file. */
+  mobileOnly?: boolean;
+};
+
+export function resolveFloorPlanFetchOptions(
+  school: string,
+  devicePreferMobile = false
+): Required<FloorPlanFetchOptions> {
+  const mobileOnly = schoolUsesMobileOnlyFloorPlans(school);
+  return {
+    preferMobile: devicePreferMobile || mobileOnly,
+    mobileOnly,
+  };
+}
+
 /** Local public URL path for a school's default floor plan SVG. */
 export function getFloorPlanPublicPath(buildingName: string): string | null {
   const filename = getFloorPlanFilename(buildingName);
@@ -66,7 +94,7 @@ export function getSupabaseFloorPlanUrl(buildingName: string): string | null {
 const svgCache = new Map<string, string>();
 const svgInflight = new Map<string, Promise<string | null>>();
 /** Bump when floor-plan fetch rules change so stale Cache API entries are ignored. */
-const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v5";
+const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v7";
 
 /**
  * True when an SVG includes architectural (or room-boundary) geometry — not
@@ -153,14 +181,17 @@ async function fetchFloorPlanSvgFromSources(
 export async function fetchFloorPlanSvgByFilename(
   filename: string,
   fallbackSvg?: string | null,
-  options?: { preferMobile?: boolean }
+  options?: FloorPlanFetchOptions
 ): Promise<string | null> {
   if (!filename) return fallbackSvg ?? null;
 
   const preferMobile = Boolean(options?.preferMobile);
-  const candidates = preferMobile
-    ? [toMobileFloorPlanFilename(filename), filename]
-    : [filename];
+  const mobileOnly = Boolean(options?.mobileOnly);
+  const candidates = mobileOnly
+    ? [toMobileFloorPlanFilename(filename)]
+    : preferMobile
+      ? [toMobileFloorPlanFilename(filename), filename]
+      : [filename];
   const uniqueCandidates = [...new Set(candidates.filter(Boolean))];
 
   for (let i = 0; i < uniqueCandidates.length; i += 1) {
@@ -184,10 +215,9 @@ export async function fetchFloorPlanSvgByFilename(
 
     if (!svg) continue;
 
-    // Mobile exports are sometimes labels-only. Fall back to the full SVG when
-    // the mobile file has no wall / space geometry and a full candidate remains.
     const isMobileCandidate = /\.mobile\.svg$/i.test(candidate);
     const hasLaterFullCandidate =
+      !mobileOnly &&
       preferMobile &&
       isMobileCandidate &&
       uniqueCandidates
@@ -216,17 +246,24 @@ export async function fetchFloorPlanSvgForLevel(
   buildingName: string,
   floor: FloorPlanLevel,
   fallbackSvg?: string | null,
-  options?: { preferMobile?: boolean }
+  options?: FloorPlanFetchOptions
 ): Promise<string | null> {
   if (!getSchoolByName(buildingName)) return fallbackSvg ?? null;
-  return fetchFloorPlanSvgByFilename(floor.filename, fallbackSvg, options);
+  const resolved = resolveFloorPlanFetchOptions(
+    buildingName,
+    options?.preferMobile
+  );
+  return fetchFloorPlanSvgByFilename(floor.filename, fallbackSvg, {
+    ...options,
+    ...resolved,
+  });
 }
 
 /** Load the default/first available floor for a school. */
 export async function fetchFloorPlanSvg(
   buildingName: string,
   fallbackSvg?: string | null,
-  options?: { preferMobile?: boolean }
+  options?: FloorPlanFetchOptions
 ): Promise<string | null> {
   const floors = await getAvailableFloors(buildingName);
   if (floors.length === 0) return fallbackSvg ?? null;
@@ -239,7 +276,7 @@ export async function fetchFloorPlanSvgForFloorId(
   buildingName: string,
   floorId: FloorLevelId,
   fallbackSvg?: string | null,
-  options?: { preferMobile?: boolean }
+  options?: FloorPlanFetchOptions
 ): Promise<string | null> {
   const floors = await getAvailableFloors(buildingName);
   const floor =
