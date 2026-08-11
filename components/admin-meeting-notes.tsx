@@ -670,7 +670,11 @@ export function AdminMeetingNotes({
                 <SelectTrigger className="h-8 w-full">
                   <SelectValue>{activeSubject}</SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent
+                  container={getOverlayRoot()}
+                  positionerClassName="z-[2]"
+                  className="z-[2]"
+                >
                   {ADMIN_MEETING_NOTE_SUBJECTS.map((subject) => (
                     <SelectItem key={subject} value={subject}>
                       {subject}
