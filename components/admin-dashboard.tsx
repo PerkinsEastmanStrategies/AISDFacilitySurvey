@@ -786,6 +786,7 @@ export function AdminDashboard() {
       {view === "detail" && selectedSchool ? (
         <AdminMeetingNotes
           school={selectedSchool}
+          adminKey={adminKey}
           open={notesOpen}
           onOpenChange={setNotesOpen}
         />

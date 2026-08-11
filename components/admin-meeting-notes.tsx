@@ -23,6 +23,15 @@ import {
   ADMIN_MEETING_NOTE_SUBJECTS,
   ADMIN_NOTE_SUBJECT_GENERAL,
 } from "@/lib/survey-data";
+import { ADMIN_KEY_HEADER } from "@/lib/admin-constants";
+import {
+  emptyInterviewNote,
+  hasAnySubjectNotes,
+  isInterviewNoteEmpty,
+  normalizeSubjectNotes,
+  todayIsoDate,
+  type InterviewNoteRecord,
+} from "@/lib/interview-notes";
 import {
   Check,
   ClipboardCopy,
@@ -48,24 +57,7 @@ const EDGE = 16;
 const OVERLAY_ID = "aisd-admin-notes-overlay-root";
 const NOTES_OVERLAY_Z_INDEX = 2147483000;
 
-type MeetingNoteRecord = {
-  assessors: string;
-  schoolLeaderParticipant: string;
-  meetingDate: string;
-  subjectNotes: Record<string, string>;
-};
-
-function hasAnySubjectNotes(subjectNotes: Record<string, string>): boolean {
-  return Object.values(subjectNotes).some((text) => text.trim());
-}
-
-function todayIsoDate(): string {
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
+type SaveState = "idle" | "loading" | "saving" | "saved" | "error";
 
 function formatMeetingDate(iso: string): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
@@ -87,41 +79,17 @@ function schoolNoteKey(school: string): string {
   return `${NOTES_DATA_PREFIX}${school.trim()}`;
 }
 
-function emptyNote(): MeetingNoteRecord {
-  return {
-    assessors: "",
-    schoolLeaderParticipant: "",
-    meetingDate: todayIsoDate(),
-    subjectNotes: {},
-  };
+function emptyNote(): InterviewNoteRecord {
+  return emptyInterviewNote();
 }
 
-function normalizeSubjectNotes(
-  value: unknown,
-  legacyBody?: string
-): Record<string, string> {
-  if (value && typeof value === "object" && !Array.isArray(value)) {
-    const notes: Record<string, string> = {};
-    for (const [key, text] of Object.entries(value)) {
-      if (typeof text === "string" && text.trim()) {
-        notes[key] = text;
-      }
-    }
-    return notes;
-  }
-  if (typeof legacyBody === "string" && legacyBody.trim()) {
-    return { [ADMIN_NOTE_SUBJECT_GENERAL]: legacyBody };
-  }
-  return {};
-}
-
-function loadNoteRecord(school: string): MeetingNoteRecord {
+function loadLocalNoteRecord(school: string): InterviewNoteRecord {
   if (typeof window === "undefined") return emptyNote();
   try {
     const raw = localStorage.getItem(schoolNoteKey(school));
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<
-        MeetingNoteRecord & { body?: string }
+        InterviewNoteRecord & { body?: string }
       >;
       return {
         assessors: typeof parsed.assessors === "string" ? parsed.assessors : "",
@@ -141,7 +109,7 @@ function loadNoteRecord(school: string): MeetingNoteRecord {
     );
     if (v2Raw) {
       const parsed = JSON.parse(v2Raw) as Partial<
-        MeetingNoteRecord & { body?: string }
+        InterviewNoteRecord & { body?: string }
       >;
       return {
         assessors: typeof parsed.assessors === "string" ? parsed.assessors : "",
@@ -171,11 +139,64 @@ function loadNoteRecord(school: string): MeetingNoteRecord {
   return emptyNote();
 }
 
-function saveNoteRecord(school: string, record: MeetingNoteRecord) {
+function saveLocalNoteRecord(school: string, record: InterviewNoteRecord) {
   try {
     localStorage.setItem(schoolNoteKey(school), JSON.stringify(record));
   } catch {
     // ignore
+  }
+}
+
+async function fetchRemoteNoteRecord(
+  school: string,
+  adminKey: string
+): Promise<InterviewNoteRecord | null> {
+  const response = await fetch(
+    `/api/admin/interview-notes?school=${encodeURIComponent(school.trim())}`,
+    {
+      headers: { [ADMIN_KEY_HEADER]: adminKey },
+    }
+  );
+  if (!response.ok) {
+    throw new Error("Failed to load interview notes.");
+  }
+  const payload = (await response.json()) as {
+    record: InterviewNoteRecord | null;
+  };
+  return payload.record;
+}
+
+async function persistRemoteNoteRecord(
+  school: string,
+  adminKey: string,
+  record: InterviewNoteRecord
+): Promise<void> {
+  const response = await fetch("/api/admin/interview-notes", {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      [ADMIN_KEY_HEADER]: adminKey,
+    },
+    body: JSON.stringify({ school: school.trim(), ...record }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to save interview notes.");
+  }
+}
+
+async function deleteRemoteNoteRecord(
+  school: string,
+  adminKey: string
+): Promise<void> {
+  const response = await fetch(
+    `/api/admin/interview-notes?school=${encodeURIComponent(school.trim())}`,
+    {
+      method: "DELETE",
+      headers: { [ADMIN_KEY_HEADER]: adminKey },
+    }
+  );
+  if (!response.ok) {
+    throw new Error("Failed to delete interview notes.");
   }
 }
 
@@ -260,7 +281,7 @@ function getOverlayRoot(): HTMLElement {
   return root;
 }
 
-function formatCopyText(school: string, record: MeetingNoteRecord): string {
+function formatCopyText(school: string, record: InterviewNoteRecord): string {
   const lines = [
     `School: ${school}`,
     `Date: ${formatMeetingDate(record.meetingDate)}`,
@@ -284,12 +305,14 @@ function formatCopyText(school: string, record: MeetingNoteRecord): string {
 
 type AdminMeetingNotesProps = {
   school: string;
+  adminKey: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 };
 
 export function AdminMeetingNotes({
   school,
+  adminKey,
   open,
   onOpenChange,
 }: AdminMeetingNotesProps) {
@@ -300,9 +323,10 @@ export function AdminMeetingNotes({
   });
   const [position, setPosition] = useState({ x: EDGE, y: EDGE });
   const [minimized, setMinimized] = useState(false);
-  const [record, setRecord] = useState<MeetingNoteRecord>(() => emptyNote());
+  const [record, setRecord] = useState<InterviewNoteRecord>(() => emptyNote());
   const [activeSubject, setActiveSubject] = useState(ADMIN_NOTE_SUBJECT_GENERAL);
   const [copied, setCopied] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
 
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{
@@ -322,7 +346,10 @@ export function AdminMeetingNotes({
     originY: number;
   } | null>(null);
   const saveTimerRef = useRef<number | null>(null);
+  const loadVersionRef = useRef(0);
   const schoolRef = useRef(school);
+  const adminKeyRef = useRef(adminKey);
+  adminKeyRef.current = adminKey;
   const recordRef = useRef(record);
   recordRef.current = record;
   const sizeRef = useRef(size);
@@ -337,14 +364,54 @@ export function AdminMeetingNotes({
 
   useEffect(() => {
     if (!school.trim()) return;
+
     const previousSchool = schoolRef.current;
     if (previousSchool !== school && previousSchool.trim()) {
-      saveNoteRecord(previousSchool, recordRef.current);
+      saveLocalNoteRecord(previousSchool, recordRef.current);
+      if (adminKeyRef.current) {
+        void persistRemoteNoteRecord(
+          previousSchool,
+          adminKeyRef.current,
+          recordRef.current
+        ).catch(() => {
+          // ignore flush errors when switching schools
+        });
+      }
     }
+
     schoolRef.current = school;
-    setRecord(loadNoteRecord(school));
     setActiveSubject(ADMIN_NOTE_SUBJECT_GENERAL);
-  }, [school]);
+    setSaveState(adminKey ? "loading" : "idle");
+
+    const localRecord = loadLocalNoteRecord(school);
+    setRecord(localRecord);
+
+    if (!adminKey) return;
+
+    const loadVersion = ++loadVersionRef.current;
+    void fetchRemoteNoteRecord(school, adminKey)
+      .then((remoteRecord) => {
+        if (loadVersionRef.current !== loadVersion) return;
+        if (remoteRecord) {
+          setRecord(remoteRecord);
+          saveLocalNoteRecord(school, remoteRecord);
+        } else {
+          setRecord(localRecord);
+          if (!isInterviewNoteEmpty(localRecord)) {
+            void persistRemoteNoteRecord(school, adminKey, localRecord).catch(
+              () => {
+                // keep local copy if migration upload fails
+              }
+            );
+          }
+        }
+        setSaveState("saved");
+      })
+      .catch(() => {
+        if (loadVersionRef.current !== loadVersion) return;
+        setSaveState("error");
+      });
+  }, [school, adminKey]);
 
   // Place mid-right in the viewport overlay whenever the panel opens.
   useLayoutEffect(() => {
@@ -377,14 +444,22 @@ export function AdminMeetingNotes({
       window.clearTimeout(saveTimerRef.current);
     }
     saveTimerRef.current = window.setTimeout(() => {
-      saveNoteRecord(school, record);
+      saveLocalNoteRecord(school, record);
+      if (!adminKey) {
+        setSaveState("saved");
+        return;
+      }
+      setSaveState("saving");
+      void persistRemoteNoteRecord(school, adminKey, record)
+        .then(() => setSaveState("saved"))
+        .catch(() => setSaveState("error"));
     }, 250);
     return () => {
       if (saveTimerRef.current !== null) {
         window.clearTimeout(saveTimerRef.current);
       }
     };
-  }, [record, school]);
+  }, [record, school, adminKey]);
 
   // Keep inside the viewport if the window resizes.
   useEffect(() => {
@@ -491,9 +566,9 @@ export function AdminMeetingNotes({
     };
   };
 
-  const updateField = <K extends keyof MeetingNoteRecord>(
+  const updateField = <K extends keyof InterviewNoteRecord>(
     key: K,
-    value: MeetingNoteRecord[K]
+    value: InterviewNoteRecord[K]
   ) => {
     setRecord((prev) => ({ ...prev, [key]: value }));
   };
@@ -526,6 +601,7 @@ export function AdminMeetingNotes({
     if (!window.confirm("Clear meeting notes for this school?")) return;
     setRecord(emptyNote());
     setActiveSubject(ADMIN_NOTE_SUBJECT_GENERAL);
+    setSaveState(adminKey ? "saving" : "saved");
     try {
       localStorage.removeItem(schoolNoteKey(school));
       localStorage.removeItem(`${NOTES_DATA_PREFIX_V2}${school.trim()}`);
@@ -533,6 +609,10 @@ export function AdminMeetingNotes({
     } catch {
       // ignore
     }
+    if (!adminKey) return;
+    void deleteRemoteNoteRecord(school, adminKey)
+      .then(() => setSaveState("saved"))
+      .catch(() => setSaveState("error"));
   };
 
   const toggleMinimized = () => {
@@ -695,7 +775,15 @@ export function AdminMeetingNotes({
           </div>
           <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-2 py-1.5">
             <p className="text-[10px] text-muted-foreground">
-              Saved in this browser
+              {saveState === "loading"
+                ? "Loading…"
+                : saveState === "saving"
+                  ? "Saving…"
+                  : saveState === "error"
+                    ? "Save failed — stored locally"
+                    : adminKey
+                      ? "Saved to database"
+                      : "Saved in this browser"}
             </p>
             <div className="flex gap-1">
               <Button
