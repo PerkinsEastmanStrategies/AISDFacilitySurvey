@@ -11,12 +11,82 @@ export interface SvgViewBox {
  */
 export const LARGE_SVG_CHAR_THRESHOLD = 512 * 1024;
 
-function isCoarsePointerDevice(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(pointer: coarse)").matches ||
-    window.matchMedia("(max-width: 767px)").matches
-  );
+/** CAFM / plan layers used to compute a tight view — excludes label-only groups. */
+const FLOOR_PLAN_GEOMETRY_LAYER_IDS = [
+  "A-WALLS",
+  "CAFM_BLDG_OTLN",
+  "CAFM_SPACE",
+  "planWalls",
+  "planDetail",
+] as const;
+
+function unionSvgViewBoxes(
+  boxes: SvgViewBox[],
+  paddingRatio: number
+): SvgViewBox | null {
+  if (boxes.length === 0) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const box of boxes) {
+    minX = Math.min(minX, box.x);
+    minY = Math.min(minY, box.y);
+    maxX = Math.max(maxX, box.x + box.width);
+    maxY = Math.max(maxY, box.y + box.height);
+  }
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  if (!(width > 0 && height > 0)) return null;
+
+  const pad = Math.max(width, height) * paddingRatio;
+  return {
+    x: minX - pad,
+    y: minY - pad,
+    width: width + pad * 2,
+    height: height + pad * 2,
+  };
+}
+
+/**
+ * Bounding box of architectural geometry only (walls, spaces, outline) — not
+ * CAFM room labels or other stray annotations that widen the artboard.
+ */
+export function getFloorPlanGeometryViewBox(
+  svgElement: SVGSVGElement,
+  paddingRatio = 0.04
+): SvgViewBox | null {
+  const boxes: SvgViewBox[] = [];
+
+  for (const layerId of FLOOR_PLAN_GEOMETRY_LAYER_IDS) {
+    const layer = svgElement.querySelector(`#${CSS.escape(layerId)}`);
+    if (!layer) continue;
+
+    try {
+      const bbox = (layer as SVGGraphicsElement).getBBox();
+      if (
+        !Number.isFinite(bbox.width) ||
+        !Number.isFinite(bbox.height) ||
+        bbox.width <= 0 ||
+        bbox.height <= 0
+      ) {
+        continue;
+      }
+      boxes.push({
+        x: bbox.x,
+        y: bbox.y,
+        width: bbox.width,
+        height: bbox.height,
+      });
+    } catch {
+      // Layer may not be measurable until mounted.
+    }
+  }
+
+  return unionSvgViewBoxes(boxes, paddingRatio);
 }
 
 export function parseSvgViewBoxAttribute(
@@ -37,6 +107,31 @@ export function parseSvgViewBoxAttribute(
   }
 
   return null;
+}
+
+/** Measure rendered floor-plan geometry bounds (walls/spaces only). */
+export function getTightFloorPlanViewBox(
+  svgElement: SVGSVGElement,
+  paddingRatio = 0.03
+): SvgViewBox | null {
+  if (typeof document === "undefined") return null;
+
+  const mount = document.createElement("div");
+  mount.style.cssText =
+    "position:fixed;left:-10000px;top:0;width:2400px;height:2400px;overflow:hidden;visibility:hidden;pointer-events:none;";
+  const clone = svgElement.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute("width", "2400");
+  clone.setAttribute("height", "2400");
+  mount.appendChild(clone);
+  document.body.appendChild(mount);
+
+  try {
+    return getFloorPlanGeometryViewBox(clone, paddingRatio);
+  } catch {
+    return null;
+  } finally {
+    document.body.removeChild(mount);
+  }
 }
 
 /** Measure rendered SVG content bounds (respects transforms). */
@@ -81,25 +176,27 @@ export function getTightSvgViewBox(
 }
 
 /**
- * Prefer declared viewBox on large SVGs and phones to avoid an extra full-DOM
- * clone + getBBox pass (a common mobile tab-kill).
+ * Prefer a tight crop to wall/space geometry; fall back to full content bounds
+ * on large SVGs where cloning the whole tree is skipped.
  */
 export function resolveSvgViewBox(
   svgElement: SVGSVGElement,
   sourceCharLength?: number
 ): SvgViewBox | null {
   const declared = parseSvgViewBoxAttribute(svgElement);
-  const skipTightCrop =
-    isCoarsePointerDevice() ||
-    (sourceCharLength !== undefined &&
-      sourceCharLength >= LARGE_SVG_CHAR_THRESHOLD);
+  const skipCloneCrop =
+    sourceCharLength !== undefined &&
+    sourceCharLength >= LARGE_SVG_CHAR_THRESHOLD;
 
-  if (skipTightCrop) {
-    return declared;
+  if (!skipCloneCrop) {
+    const geometry = getTightFloorPlanViewBox(svgElement);
+    if (geometry) return geometry;
+
+    const tight = getTightSvgViewBox(svgElement);
+    if (tight) return tight;
   }
 
-  const tight = getTightSvgViewBox(svgElement);
-  return tight ?? declared;
+  return declared;
 }
 
 export function applySvgViewBox(
@@ -122,6 +219,12 @@ export function cropMountedSvgToContent(
   paddingRatio = 0.04
 ): SvgViewBox | null {
   try {
+    const geometry = getFloorPlanGeometryViewBox(svgElement, paddingRatio);
+    if (geometry) {
+      applySvgViewBox(svgElement, geometry);
+      return geometry;
+    }
+
     const bbox = svgElement.getBBox();
     if (
       !Number.isFinite(bbox.width) ||
