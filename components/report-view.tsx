@@ -22,11 +22,9 @@ import { clearSurveyDraft } from "@/lib/survey-draft";
 import { getSchoolByName } from "@/lib/schools-data";
 import { getSpaceColor } from "@/lib/spaces-data";
 import {
-  fetchFloorPlanSvgForLevel,
+  fetchFloorPlanSvgByFilename,
   getAvailableFloors,
   prefetchFloorPlanSvgs,
-  resolveFloorPlanFetchOptions,
-  toMobileFloorPlanFilename,
   type FloorPlanLevel,
 } from "@/lib/floor-plans";
 import { pickDefaultFloor } from "@/lib/floor-plan-manifest";
@@ -97,26 +95,17 @@ export function ReportView({
       setFloorPlanLoading(true);
 
       if (initialFloor) {
-        const fetchOptions = resolveFloorPlanFetchOptions(data.school, preferMobile);
-        const svg = await fetchFloorPlanSvgForLevel(
-          data.school,
-          initialFloor,
+        const svg = await fetchFloorPlanSvgByFilename(
+          initialFloor.filename,
           null,
-          fetchOptions
+          { preferMobile }
         );
         if (!cancelled) setReportSvgContent(svg);
-        if (svg && !fetchOptions.preferMobile) {
+        if (svg && !preferMobile) {
           prefetchFloorPlanSvgs(
             floors
               .filter((floor) => floor.id !== initialFloor.id)
               .map((floor) => floor.filename)
-              .filter(Boolean)
-          );
-        } else if (svg && fetchOptions.mobileOnly) {
-          prefetchFloorPlanSvgs(
-            floors
-              .filter((floor) => floor.id !== initialFloor.id)
-              .map((floor) => toMobileFloorPlanFilename(floor.filename))
               .filter(Boolean)
           );
         }
@@ -139,16 +128,15 @@ export function ReportView({
       if (!floor) return;
       setActiveFloorId(floorId);
       setFloorPlanLoading(true);
-      const svg = await fetchFloorPlanSvgForLevel(
-        data.school,
-        floor,
+      const svg = await fetchFloorPlanSvgByFilename(
+        floor.filename,
         null,
-        resolveFloorPlanFetchOptions(data.school, preferMobile)
+        { preferMobile }
       );
       setReportSvgContent(svg);
       setFloorPlanLoading(false);
     },
-    [availableFloors, data.school, preferMobile]
+    [availableFloors, preferMobile]
   );
 
   const completedResponses = data.responses.filter((r) => isRatingScored(r.rating));

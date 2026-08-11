@@ -11,7 +11,7 @@ import { FloorPlanViewer } from "@/components/floor-plan-viewer";
 import { MapViewer } from "@/components/map-viewer";
 import { SpaceAssignmentForm } from "@/components/space-assignment-form";
 import { getSchoolByName } from "@/lib/schools-data";
-import { fetchFloorPlanSvgForLevel, getAvailableFloors, prefetchFloorPlanSvgs, resolveFloorPlanFetchOptions, toMobileFloorPlanFilename, type FloorPlanLevel } from "@/lib/floor-plans";
+import { fetchFloorPlanSvgByFilename, getAvailableFloors, prefetchFloorPlanSvgs, type FloorPlanLevel } from "@/lib/floor-plans";
 import { pickDefaultFloor } from "@/lib/floor-plan-manifest";
 import { extractRoomsFromSvg, getSpaceColor, type RoomInfo } from "@/lib/spaces-data";
 import {
@@ -429,32 +429,18 @@ export default function SurveyApp({
       setActiveFloorId(initialFloor?.id ?? "floor-1");
       setFloorPlanLoading(true);
 
-      const fetchOptions = resolveFloorPlanFetchOptions(
-        surveyData.school,
-        preferMobile
-      );
       const svg = initialFloor
-        ? await fetchFloorPlanSvgForLevel(
-            surveyData.school,
-            initialFloor,
-            null,
-            fetchOptions
-          )
+        ? await fetchFloorPlanSvgByFilename(initialFloor.filename, null, {
+            preferMobile,
+          })
         : null;
       if (cancelled) return;
 
-      if (svg && !fetchOptions.preferMobile) {
+      if (svg && !preferMobile) {
         prefetchFloorPlanSvgs(
           floors
             .filter((floor) => floor.id !== initialFloor?.id)
             .map((floor) => floor.filename)
-            .filter(Boolean)
-        );
-      } else if (svg && fetchOptions.mobileOnly) {
-        prefetchFloorPlanSvgs(
-          floors
-            .filter((floor) => floor.id !== initialFloor?.id)
-            .map((floor) => toMobileFloorPlanFilename(floor.filename))
             .filter(Boolean)
         );
       }
@@ -486,17 +472,14 @@ export default function SurveyApp({
 
       setActiveFloorId(floorId);
       setFloorPlanLoading(true);
-      const svg = await fetchFloorPlanSvgForLevel(
-        surveyData.school,
-        floor,
-        null,
-        resolveFloorPlanFetchOptions(surveyData.school, preferMobile)
-      );
+      const svg = await fetchFloorPlanSvgByFilename(floor.filename, null, {
+        preferMobile,
+      });
       setSurveyData((prev) => ({ ...prev, svgContent: svg }));
       if (!svg) setRightView("map");
       setFloorPlanLoading(false);
     },
-    [availableFloors, preferMobile, surveyData.school]
+    [availableFloors, preferMobile]
   );
 
   const selectedSchool = getSchoolByName(surveyData.school);
