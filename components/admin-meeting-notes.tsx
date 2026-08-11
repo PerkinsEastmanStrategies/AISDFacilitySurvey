@@ -13,6 +13,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  ADMIN_MEETING_NOTE_SUBJECTS,
+  ADMIN_NOTE_SUBJECT_GENERAL,
+} from "@/lib/survey-data";
+import {
   Check,
   ClipboardCopy,
   GripVertical,
@@ -23,7 +34,8 @@ import {
   X,
 } from "lucide-react";
 
-const NOTES_DATA_PREFIX = "aisd-admin-meeting-notes:v2:";
+const NOTES_DATA_PREFIX = "aisd-admin-meeting-notes:v3:";
+const NOTES_DATA_PREFIX_V2 = "aisd-admin-meeting-notes:v2:";
 const NOTES_DATA_PREFIX_V1 = "aisd-admin-meeting-notes:v1:";
 const NOTES_SIZE_KEY = "aisd-admin-meeting-notes-size:v2";
 
@@ -39,8 +51,12 @@ type MeetingNoteRecord = {
   assessors: string;
   schoolLeaderParticipant: string;
   meetingDate: string;
-  body: string;
+  subjectNotes: Record<string, string>;
 };
+
+function hasAnySubjectNotes(subjectNotes: Record<string, string>): boolean {
+  return Object.values(subjectNotes).some((text) => text.trim());
+}
 
 function todayIsoDate(): string {
   const now = new Date();
@@ -75,8 +91,27 @@ function emptyNote(): MeetingNoteRecord {
     assessors: "",
     schoolLeaderParticipant: "",
     meetingDate: todayIsoDate(),
-    body: "",
+    subjectNotes: {},
   };
+}
+
+function normalizeSubjectNotes(
+  value: unknown,
+  legacyBody?: string
+): Record<string, string> {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const notes: Record<string, string> = {};
+    for (const [key, text] of Object.entries(value)) {
+      if (typeof text === "string" && text.trim()) {
+        notes[key] = text;
+      }
+    }
+    return notes;
+  }
+  if (typeof legacyBody === "string" && legacyBody.trim()) {
+    return { [ADMIN_NOTE_SUBJECT_GENERAL]: legacyBody };
+  }
+  return {};
 }
 
 function loadNoteRecord(school: string): MeetingNoteRecord {
@@ -84,7 +119,9 @@ function loadNoteRecord(school: string): MeetingNoteRecord {
   try {
     const raw = localStorage.getItem(schoolNoteKey(school));
     if (raw) {
-      const parsed = JSON.parse(raw) as Partial<MeetingNoteRecord>;
+      const parsed = JSON.parse(raw) as Partial<
+        MeetingNoteRecord & { body?: string }
+      >;
       return {
         assessors: typeof parsed.assessors === "string" ? parsed.assessors : "",
         schoolLeaderParticipant:
@@ -95,13 +132,38 @@ function loadNoteRecord(school: string): MeetingNoteRecord {
           typeof parsed.meetingDate === "string" && parsed.meetingDate
             ? parsed.meetingDate
             : todayIsoDate(),
-        body: typeof parsed.body === "string" ? parsed.body : "",
+        subjectNotes: normalizeSubjectNotes(parsed.subjectNotes, parsed.body),
+      };
+    }
+    const v2Raw = localStorage.getItem(
+      `${NOTES_DATA_PREFIX_V2}${school.trim()}`
+    );
+    if (v2Raw) {
+      const parsed = JSON.parse(v2Raw) as Partial<
+        MeetingNoteRecord & { body?: string }
+      >;
+      return {
+        assessors: typeof parsed.assessors === "string" ? parsed.assessors : "",
+        schoolLeaderParticipant:
+          typeof parsed.schoolLeaderParticipant === "string"
+            ? parsed.schoolLeaderParticipant
+            : "",
+        meetingDate:
+          typeof parsed.meetingDate === "string" && parsed.meetingDate
+            ? parsed.meetingDate
+            : todayIsoDate(),
+        subjectNotes: normalizeSubjectNotes(parsed.subjectNotes, parsed.body),
       };
     }
     const legacy = localStorage.getItem(
       `${NOTES_DATA_PREFIX_V1}${school.trim()}`
     );
-    if (legacy) return { ...emptyNote(), body: legacy };
+    if (legacy) {
+      return {
+        ...emptyNote(),
+        subjectNotes: { [ADMIN_NOTE_SUBJECT_GENERAL]: legacy },
+      };
+    }
   } catch {
     // ignore
   }
@@ -198,15 +260,25 @@ function getOverlayRoot(): HTMLElement {
 }
 
 function formatCopyText(school: string, record: MeetingNoteRecord): string {
-  return [
+  const lines = [
     `School: ${school}`,
     `Date: ${formatMeetingDate(record.meetingDate)}`,
     `Assessor(s): ${record.assessors || "—"}`,
     `School Leader Participant: ${record.schoolLeaderParticipant || "—"}`,
-    "",
-    "Notes:",
-    record.body || "—",
-  ].join("\n");
+  ];
+
+  const subjectsWithNotes = ADMIN_MEETING_NOTE_SUBJECTS.filter((subject) =>
+    record.subjectNotes[subject]?.trim()
+  );
+  if (subjectsWithNotes.length === 0) {
+    lines.push("", "Notes:", "—");
+  } else {
+    for (const subject of subjectsWithNotes) {
+      lines.push("", `${subject}:`, record.subjectNotes[subject] || "—");
+    }
+  }
+
+  return lines.join("\n");
 }
 
 type AdminMeetingNotesProps = {
@@ -228,6 +300,7 @@ export function AdminMeetingNotes({
   const [position, setPosition] = useState({ x: EDGE, y: EDGE });
   const [minimized, setMinimized] = useState(false);
   const [record, setRecord] = useState<MeetingNoteRecord>(() => emptyNote());
+  const [activeSubject, setActiveSubject] = useState(ADMIN_NOTE_SUBJECT_GENERAL);
   const [copied, setCopied] = useState(false);
 
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -263,8 +336,13 @@ export function AdminMeetingNotes({
 
   useEffect(() => {
     if (!school.trim()) return;
-    setRecord(loadNoteRecord(school));
+    const previousSchool = schoolRef.current;
+    if (previousSchool !== school && previousSchool.trim()) {
+      saveNoteRecord(previousSchool, recordRef.current);
+    }
     schoolRef.current = school;
+    setRecord(loadNoteRecord(school));
+    setActiveSubject(ADMIN_NOTE_SUBJECT_GENERAL);
   }, [school]);
 
   // Place mid-right in the viewport overlay whenever the panel opens.
@@ -277,14 +355,6 @@ export function AdminMeetingNotes({
     setPosition(placed);
     expandedHeightRef.current = nextSize.height;
   }, [open]);
-
-  useEffect(() => {
-    if (!school.trim()) return;
-    if (schoolRef.current === school) return;
-    saveNoteRecord(schoolRef.current, recordRef.current);
-    schoolRef.current = school;
-    setRecord(loadNoteRecord(school));
-  }, [school]);
 
   useEffect(() => {
     try {
@@ -427,6 +497,15 @@ export function AdminMeetingNotes({
     setRecord((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateSubjectNote = (subject: string, body: string) => {
+    setRecord((prev) => ({
+      ...prev,
+      subjectNotes: { ...prev.subjectNotes, [subject]: body },
+    }));
+  };
+
+  const activeBody = record.subjectNotes[activeSubject] ?? "";
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(formatCopyText(school, record));
@@ -439,14 +518,16 @@ export function AdminMeetingNotes({
 
   const handleClear = () => {
     const hasContent =
-      record.body.trim() ||
+      hasAnySubjectNotes(record.subjectNotes) ||
       record.assessors.trim() ||
       record.schoolLeaderParticipant.trim();
     if (!hasContent) return;
     if (!window.confirm("Clear meeting notes for this school?")) return;
     setRecord(emptyNote());
+    setActiveSubject(ADMIN_NOTE_SUBJECT_GENERAL);
     try {
       localStorage.removeItem(schoolNoteKey(school));
+      localStorage.removeItem(`${NOTES_DATA_PREFIX_V2}${school.trim()}`);
       localStorage.removeItem(`${NOTES_DATA_PREFIX_V1}${school.trim()}`);
     } catch {
       // ignore
@@ -576,12 +657,34 @@ export function AdminMeetingNotes({
                 {formatMeetingDate(record.meetingDate)}
               </p>
             </div>
+            <div>
+              <label className="mb-0.5 block text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                Subject
+              </label>
+              <Select
+                value={activeSubject}
+                onValueChange={(value) => {
+                  if (value) setActiveSubject(value);
+                }}
+              >
+                <SelectTrigger className="h-8 w-full">
+                  <SelectValue>{activeSubject}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {ADMIN_MEETING_NOTE_SUBJECTS.map((subject) => (
+                    <SelectItem key={subject} value={subject}>
+                      {subject}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <div className="relative min-h-0 flex-1 p-2">
             <Textarea
-              value={record.body}
-              onChange={(e) => updateField("body", e.target.value)}
-              placeholder="Capture comments from the school leader review meeting…"
+              value={activeBody}
+              onChange={(e) => updateSubjectNote(activeSubject, e.target.value)}
+              placeholder={`Notes for ${activeSubject}…`}
               className="h-full min-h-[8rem] resize-none overflow-y-auto bg-background text-sm [field-sizing:fixed]"
             />
           </div>
@@ -597,7 +700,7 @@ export function AdminMeetingNotes({
                 className="h-7 gap-1 text-xs"
                 onClick={handleCopy}
                 disabled={
-                  !record.body.trim() &&
+                  !hasAnySubjectNotes(record.subjectNotes) &&
                   !record.assessors.trim() &&
                   !record.schoolLeaderParticipant.trim()
                 }
@@ -616,7 +719,7 @@ export function AdminMeetingNotes({
                 className="h-7 gap-1 text-xs"
                 onClick={handleClear}
                 disabled={
-                  !record.body.trim() &&
+                  !hasAnySubjectNotes(record.subjectNotes) &&
                   !record.assessors.trim() &&
                   !record.schoolLeaderParticipant.trim()
                 }

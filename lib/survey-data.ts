@@ -684,6 +684,25 @@ export const PRIORITIZATION_CATEGORIES: string[] = SURVEY_QUESTIONS.filter(
     q.category !== "Overall Educational Suitability"
 ).map((q) => q.category);
 
+/** Unique ESA section category headers (survey question order). */
+export const ESA_CATEGORY_HEADERS: string[] = [
+  ...new Set(
+    SURVEY_QUESTIONS.filter((q) => q.section === "Educational Suitability").map(
+      (q) => q.category
+    )
+  ),
+];
+
+export const ADMIN_NOTE_SUBJECT_GENERAL = "General";
+export const ADMIN_NOTE_SUBJECT_GENERAL_FCA = "General Facility Condition (FCA)";
+
+/** Subject options for admin meeting notes (General, FCA overview, then ESA headers). */
+export const ADMIN_MEETING_NOTE_SUBJECTS: string[] = [
+  ADMIN_NOTE_SUBJECT_GENERAL,
+  ADMIN_NOTE_SUBJECT_GENERAL_FCA,
+  ...ESA_CATEGORY_HEADERS,
+];
+
 /** Maximum number of priorities a respondent may select in Campus Improvement Priorities. */
 export const MAX_PRIORITIES = 5;
 
