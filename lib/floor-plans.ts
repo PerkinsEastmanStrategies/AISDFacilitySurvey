@@ -32,7 +32,7 @@ export function getFloorPlanPublicPathForFilename(filename: string): string {
 
 /**
  * Lightweight mobile variant naming: `SCHOOL L1.svg` → `SCHOOL L1.mobile.svg`.
- * The app always tries the mobile variant first on every device.
+ * Desktop keeps the original filename from the manifest.
  */
 export function toMobileFloorPlanFilename(filename: string): string {
   if (!filename) return filename;
@@ -66,7 +66,7 @@ export function getSupabaseFloorPlanUrl(buildingName: string): string | null {
 const svgCache = new Map<string, string>();
 const svgInflight = new Map<string, Promise<string | null>>();
 /** Bump when floor-plan fetch rules change so stale Cache API entries are ignored. */
-const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v6";
+const FLOOR_PLAN_CACHE_NAME = "aisd-floor-plans-v5";
 
 /**
  * True when an SVG includes architectural (or room-boundary) geometry — not
@@ -157,7 +157,7 @@ export async function fetchFloorPlanSvgByFilename(
 ): Promise<string | null> {
   if (!filename) return fallbackSvg ?? null;
 
-  const preferMobile = options?.preferMobile ?? true;
+  const preferMobile = Boolean(options?.preferMobile);
   const candidates = preferMobile
     ? [toMobileFloorPlanFilename(filename), filename]
     : [filename];
