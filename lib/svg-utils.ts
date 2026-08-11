@@ -11,6 +11,84 @@ export interface SvgViewBox {
  */
 export const LARGE_SVG_CHAR_THRESHOLD = 512 * 1024;
 
+/** Layers that define the building — excludes CAFM_ID labels and stray artboard junk. */
+const FLOOR_PLAN_GEOMETRY_LAYER_IDS = [
+  "CAFM_SPACE",
+  "A-WALLS",
+  "CAFM_BLDG_OTLN",
+  "planWalls",
+  "planDetail",
+] as const;
+
+function unionSvgViewBoxes(
+  boxes: SvgViewBox[],
+  paddingRatio: number
+): SvgViewBox | null {
+  if (boxes.length === 0) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const box of boxes) {
+    minX = Math.min(minX, box.x);
+    minY = Math.min(minY, box.y);
+    maxX = Math.max(maxX, box.x + box.width);
+    maxY = Math.max(maxY, box.y + box.height);
+  }
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  if (!(width > 0 && height > 0)) return null;
+
+  const pad = Math.max(width, height) * paddingRatio;
+  return {
+    x: minX - pad,
+    y: minY - pad,
+    width: width + pad * 2,
+    height: height + pad * 2,
+  };
+}
+
+/**
+ * Bounding box of room spaces and wall geometry — ignores CAFM labels and
+ * other distant artifacts that inflate the artboard (e.g. East Side ECHS).
+ */
+export function getFloorPlanGeometryViewBox(
+  svgElement: SVGSVGElement,
+  paddingRatio = 0.04
+): SvgViewBox | null {
+  const boxes: SvgViewBox[] = [];
+
+  for (const layerId of FLOOR_PLAN_GEOMETRY_LAYER_IDS) {
+    const layer = svgElement.querySelector(`#${CSS.escape(layerId)}`);
+    if (!layer) continue;
+
+    try {
+      const bbox = (layer as SVGGraphicsElement).getBBox();
+      if (
+        !Number.isFinite(bbox.width) ||
+        !Number.isFinite(bbox.height) ||
+        bbox.width <= 0 ||
+        bbox.height <= 0
+      ) {
+        continue;
+      }
+      boxes.push({
+        x: bbox.x,
+        y: bbox.y,
+        width: bbox.width,
+        height: bbox.height,
+      });
+    } catch {
+      // Layer may not be measurable until mounted.
+    }
+  }
+
+  return unionSvgViewBoxes(boxes, paddingRatio);
+}
+
 function isCoarsePointerDevice(): boolean {
   if (typeof window === "undefined") return false;
   return (
@@ -98,8 +176,36 @@ export function resolveSvgViewBox(
     return declared;
   }
 
+  const geometry = getTightFloorPlanViewBox(svgElement);
+  if (geometry) return geometry;
+
   const tight = getTightSvgViewBox(svgElement);
   return tight ?? declared;
+}
+
+/** Measure space/wall geometry on a mounted clone (parse-time crop). */
+function getTightFloorPlanViewBox(
+  svgElement: SVGSVGElement,
+  paddingRatio = 0.03
+): SvgViewBox | null {
+  if (typeof document === "undefined") return null;
+
+  const mount = document.createElement("div");
+  mount.style.cssText =
+    "position:fixed;left:-10000px;top:0;width:2400px;height:2400px;overflow:hidden;visibility:hidden;pointer-events:none;";
+  const clone = svgElement.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute("width", "2400");
+  clone.setAttribute("height", "2400");
+  mount.appendChild(clone);
+  document.body.appendChild(mount);
+
+  try {
+    return getFloorPlanGeometryViewBox(clone, paddingRatio);
+  } catch {
+    return null;
+  } finally {
+    document.body.removeChild(mount);
+  }
 }
 
 export function applySvgViewBox(
@@ -122,6 +228,12 @@ export function cropMountedSvgToContent(
   paddingRatio = 0.04
 ): SvgViewBox | null {
   try {
+    const geometry = getFloorPlanGeometryViewBox(svgElement, paddingRatio);
+    if (geometry) {
+      applySvgViewBox(svgElement, geometry);
+      return geometry;
+    }
+
     const bbox = svgElement.getBBox();
     if (
       !Number.isFinite(bbox.width) ||
