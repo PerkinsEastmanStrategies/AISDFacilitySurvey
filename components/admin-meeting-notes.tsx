@@ -46,6 +46,7 @@ const MIN_HEIGHT = 280;
 const MINIMIZED_HEIGHT = 44;
 const EDGE = 16;
 const OVERLAY_ID = "aisd-admin-notes-overlay-root";
+const NOTES_OVERLAY_Z_INDEX = 2147483000;
 
 type MeetingNoteRecord = {
   assessors: string;
@@ -250,7 +251,7 @@ function getOverlayRoot(): HTMLElement {
         "width:100vw",
         "height:100vh",
         "pointer-events:none",
-        "z-index:2147483000",
+        `z-index:${NOTES_OVERLAY_Z_INDEX}`,
         "overflow:visible",
       ].join(";")
     );
@@ -671,9 +672,9 @@ export function AdminMeetingNotes({
                   <SelectValue>{activeSubject}</SelectValue>
                 </SelectTrigger>
                 <SelectContent
-                  container={getOverlayRoot()}
-                  positionerClassName="z-[2]"
-                  className="z-[2]"
+                  positionerClassName="z-[2147483001]"
+                  className="z-[2147483001] max-h-60"
+                  alignItemWithTrigger={false}
                 >
                   {ADMIN_MEETING_NOTE_SUBJECTS.map((subject) => (
                     <SelectItem key={subject} value={subject}>
