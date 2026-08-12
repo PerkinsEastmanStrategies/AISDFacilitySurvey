@@ -11,6 +11,195 @@ export interface SvgViewBox {
  */
 export const LARGE_SVG_CHAR_THRESHOLD = 512 * 1024;
 
+/** Schools whose CAFM exports have stray artboard junk outside the building. */
+const CAFM_SPACE_CROP_SCHOOLS = new Set(["EASTSIDE ECHS"]);
+
+export function schoolUsesCafmSpaceCrop(school?: string): boolean {
+  if (!school) return false;
+  return CAFM_SPACE_CROP_SCHOOLS.has(school.trim().toUpperCase());
+}
+
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function padViewBox(box: SvgViewBox, paddingRatio: number): SvgViewBox {
+  const pad = Math.max(box.width, box.height) * paddingRatio;
+  return {
+    x: box.x - pad,
+    y: box.y - pad,
+    width: box.width + pad * 2,
+    height: box.height + pad * 2,
+  };
+}
+
+function unionViewBoxes(
+  boxes: SvgViewBox[],
+  paddingRatio: number
+): SvgViewBox | null {
+  if (boxes.length === 0) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const box of boxes) {
+    minX = Math.min(minX, box.x);
+    minY = Math.min(minY, box.y);
+    maxX = Math.max(maxX, box.x + box.width);
+    maxY = Math.max(maxY, box.y + box.height);
+  }
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  if (!(width > 0 && height > 0)) return null;
+
+  return padViewBox({ x: minX, y: minY, width, height }, paddingRatio);
+}
+
+/** Drop distant outlier shapes — keeps the main building cluster (upper-right on East Side). */
+function unionViewBoxesRobust(
+  boxes: SvgViewBox[],
+  paddingRatio: number
+): SvgViewBox | null {
+  if (boxes.length === 0) return null;
+  if (boxes.length === 1) return padViewBox(boxes[0], paddingRatio);
+
+  const enriched = boxes.map((box) => ({
+    ...box,
+    cx: box.x + box.width / 2,
+    cy: box.y + box.height / 2,
+  }));
+
+  const medX = median(enriched.map((entry) => entry.cx));
+  const medY = median(enriched.map((entry) => entry.cy));
+  const distances = enriched.map((entry) =>
+    Math.hypot(entry.cx - medX, entry.cy - medY)
+  );
+  const sortedDist = [...distances].sort((a, b) => a - b);
+  const cutoffIndex = Math.max(
+    0,
+    Math.min(sortedDist.length - 1, Math.floor(sortedDist.length * 0.92))
+  );
+  const threshold = sortedDist[cutoffIndex] * 1.05;
+  const kept = enriched.filter((_, index) => distances[index] <= threshold);
+
+  return unionViewBoxes(kept.length > 0 ? kept : enriched, paddingRatio);
+}
+
+function clientRectToSvgViewBox(
+  svgRoot: SVGSVGElement,
+  rect: DOMRect
+): SvgViewBox | null {
+  const ctm = svgRoot.getScreenCTM();
+  if (!ctm || (rect.width <= 0 && rect.height <= 0)) return null;
+
+  const inv = ctm.inverse();
+  const corners = [
+    { x: rect.left, y: rect.top },
+    { x: rect.right, y: rect.top },
+    { x: rect.right, y: rect.bottom },
+    { x: rect.left, y: rect.bottom },
+  ];
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  for (const corner of corners) {
+    const point = svgRoot.createSVGPoint();
+    point.x = corner.x;
+    point.y = corner.y;
+    const mapped = point.matrixTransform(inv);
+    minX = Math.min(minX, mapped.x);
+    minY = Math.min(minY, mapped.y);
+    maxX = Math.max(maxX, mapped.x);
+    maxY = Math.max(maxY, mapped.y);
+  }
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  if (!(width > 0 && height > 0)) return null;
+
+  return { x: minX, y: minY, width, height };
+}
+
+function getElementViewBoxInRootSvg(
+  element: SVGGraphicsElement,
+  svgRoot: SVGSVGElement
+): SvgViewBox | null {
+  try {
+    return clientRectToSvgViewBox(svgRoot, element.getBoundingClientRect());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Bounding box of #CAFM_SPACE room polylines only, with outlier shapes removed.
+ */
+export function getCafmSpaceContentViewBox(
+  svgElement: SVGSVGElement,
+  paddingRatio = 0.04
+): SvgViewBox | null {
+  const cafmSpace = svgElement.querySelector("#CAFM_SPACE");
+  if (!cafmSpace) return null;
+
+  const shapeBoxes: SvgViewBox[] = [];
+  for (const shape of cafmSpace.querySelectorAll(
+    "path, polygon, polyline, rect, line"
+  )) {
+    const box = getElementViewBoxInRootSvg(
+      shape as SVGGraphicsElement,
+      svgElement
+    );
+    if (box && box.width > 0 && box.height > 0) {
+      shapeBoxes.push(box);
+    }
+  }
+
+  if (shapeBoxes.length > 0) {
+    return unionViewBoxesRobust(shapeBoxes, paddingRatio);
+  }
+
+  const layerBox = getElementViewBoxInRootSvg(
+    cafmSpace as SVGGraphicsElement,
+    svgElement
+  );
+  return layerBox ? padViewBox(layerBox, paddingRatio) : null;
+}
+
+function getTightCafmSpaceViewBox(
+  svgElement: SVGSVGElement,
+  paddingRatio = 0.03
+): SvgViewBox | null {
+  if (typeof document === "undefined") return null;
+
+  const mount = document.createElement("div");
+  mount.style.cssText =
+    "position:fixed;left:-10000px;top:0;width:2400px;height:2400px;overflow:hidden;visibility:hidden;pointer-events:none;";
+  const clone = svgElement.cloneNode(true) as SVGSVGElement;
+  clone.setAttribute("width", "2400");
+  clone.setAttribute("height", "2400");
+  mount.appendChild(clone);
+  document.body.appendChild(mount);
+
+  try {
+    return getCafmSpaceContentViewBox(clone, paddingRatio);
+  } catch {
+    return null;
+  } finally {
+    document.body.removeChild(mount);
+  }
+}
+
 function isCoarsePointerDevice(): boolean {
   if (typeof window === "undefined") return false;
   return (
@@ -86,16 +275,24 @@ export function getTightSvgViewBox(
  */
 export function resolveSvgViewBox(
   svgElement: SVGSVGElement,
-  sourceCharLength?: number
+  sourceCharLength?: number,
+  school?: string
 ): SvgViewBox | null {
   const declared = parseSvgViewBoxAttribute(svgElement);
+  const useCafmSpaceCrop = schoolUsesCafmSpaceCrop(school);
   const skipTightCrop =
-    isCoarsePointerDevice() ||
-    (sourceCharLength !== undefined &&
-      sourceCharLength >= LARGE_SVG_CHAR_THRESHOLD);
+    !useCafmSpaceCrop &&
+    (isCoarsePointerDevice() ||
+      (sourceCharLength !== undefined &&
+        sourceCharLength >= LARGE_SVG_CHAR_THRESHOLD));
 
   if (skipTightCrop) {
     return declared;
+  }
+
+  if (useCafmSpaceCrop) {
+    const cafmSpace = getTightCafmSpaceViewBox(svgElement);
+    if (cafmSpace) return cafmSpace;
   }
 
   const tight = getTightSvgViewBox(svgElement);
@@ -119,9 +316,18 @@ export function applySvgViewBox(
  */
 export function cropMountedSvgToContent(
   svgElement: SVGSVGElement,
-  paddingRatio = 0.04
+  paddingRatio = 0.04,
+  school?: string
 ): SvgViewBox | null {
   try {
+    if (schoolUsesCafmSpaceCrop(school)) {
+      const cafmSpace = getCafmSpaceContentViewBox(svgElement, paddingRatio);
+      if (cafmSpace) {
+        applySvgViewBox(svgElement, cafmSpace);
+        return cafmSpace;
+      }
+    }
+
     const bbox = svgElement.getBBox();
     if (
       !Number.isFinite(bbox.width) ||

@@ -180,7 +180,11 @@ export function FloorPlanViewer({
         return;
       }
 
-      const effectiveViewBox = resolveSvgViewBox(svgElement, sourceLength);
+      const effectiveViewBox = resolveSvgViewBox(
+        svgElement,
+        sourceLength,
+        buildingName
+      );
       if (effectiveViewBox) {
         applySvgViewBox(svgElement, effectiveViewBox);
         setViewBox(effectiveViewBox);
@@ -202,7 +206,7 @@ export function FloorPlanViewer({
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [svgContent, isMobile]);
+  }, [svgContent, isMobile, buildingName]);
 
   useEffect(() => {
     if (!svgHostRef.current) {
@@ -232,19 +236,24 @@ export function FloorPlanViewer({
     // Wait for SVG layout, then hide colliding labels visually. Their CAFM_ID
     // nodes remain available for room matching and click identification.
     const sourceLen = svgSourceLengthRef.current;
+    let innerFrameId = 0;
     const frameId = requestAnimationFrame(() => {
-      if (svgRef.current !== mounted) return;
-      suppressOverlappingCafmLabels(mounted);
+      innerFrameId = requestAnimationFrame(() => {
+        if (svgRef.current !== mounted) return;
+        suppressOverlappingCafmLabels(mounted);
 
-      // Crop empty CAFM canvas margins so the building fills the viewer.
-      // Uses root getBBox on the already-mounted SVG (respects transforms).
-      if (sourceLen > 0 && sourceLen < MOUNT_CROP_MAX_CHARS) {
-        const cropped = cropMountedSvgToContent(mounted);
-        if (cropped) setViewBox(cropped);
-      }
+        // Crop empty CAFM canvas margins so the building fills the viewer.
+        if (sourceLen > 0 && sourceLen < MOUNT_CROP_MAX_CHARS) {
+          const cropped = cropMountedSvgToContent(mounted, 0.04, buildingName);
+          if (cropped) setViewBox(cropped);
+        }
+      });
     });
-    return () => cancelAnimationFrame(frameId);
-  }, [svgMountKey, svgReady]);
+    return () => {
+      cancelAnimationFrame(frameId);
+      if (innerFrameId) cancelAnimationFrame(innerFrameId);
+    };
+  }, [svgMountKey, svgReady, buildingName]);
 
   useEffect(() => {
     if (process.env.NODE_ENV === "production") return;
