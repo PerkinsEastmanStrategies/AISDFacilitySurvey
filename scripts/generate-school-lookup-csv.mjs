@@ -26,6 +26,11 @@ const FLOOR_COLUMNS = [
   "Floor 3",
   "Floor 4",
   "Floor 5",
+  "Floor 6",
+  "Floor 7",
+  "Floor 8",
+  "Floor 9",
+  "Athletics Building",
   "Mezzanine",
 ];
 
@@ -129,6 +134,11 @@ const rows = geo.features
       "Floor 3": "",
       "Floor 4": "",
       "Floor 5": "",
+      "Floor 6": "",
+      "Floor 7": "",
+      "Floor 8": "",
+      "Floor 9": "",
+      "Athletics Building": "",
       Mezzanine: "",
       uploaded: "",
       source_file: "",
